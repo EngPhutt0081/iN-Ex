@@ -1,0 +1,17 @@
+{
+  "name": "iN&Ex",
+  "short_name": "iN&Ex",
+  "description": "บันทึกรายรับ-รายจ่าย การเดินทาง การลงทุน และภาษี",
+  "lang": "th",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0E1012",
+  "theme_color": "#0E1012",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
