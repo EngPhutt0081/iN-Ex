@@ -1,5 +1,5 @@
 /* iN&Ex service worker: app works offline; online opens always get the latest version */
-const V = 'inex-v1';
+const V = 'inex-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
