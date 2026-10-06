@@ -22,7 +22,10 @@ var ACT = {bank: 'บัญชีธนาคาร', cash: 'เงินสด'
 var PROV = {kbank: 'กสิกรไทย', scb: 'ไทยพาณิชย์', bbl: 'กรุงเทพ', ktb: 'กรุงไทย', bay: 'กรุงศรีอยุธยา', ttb: 'ทหารไทยธนชาต',
   gsb: 'ออมสิน', baac: 'ธ.ก.ส.', ghb: 'อาคารสงเคราะห์', uob: 'ยูโอบี', cimb: 'ซีไอเอ็มบี ไทย', kkp: 'เกียรตินาคินภัทร',
   lhb: 'แลนด์ แอนด์ เฮ้าส์', tisco: 'ทิสโก้', icbc: 'ไอซีบีซี (ไทย)', otherbank: 'ธนาคารอื่น', truemoney: 'TrueMoney Wallet',
-  rabbit: 'บัตร Rabbit', mrtcard: 'บัตร MRT', shopeepay: 'ShopeePay', linepay: 'Rabbit LINE Pay', otherwallet: 'อื่นๆ'};
+  rabbit: 'บัตร Rabbit', mrtcard: 'บัตร MRT', shopeepay: 'ShopeePay', linepay: 'Rabbit LINE Pay', otherwallet: 'อื่นๆ',
+  ktc: 'KTC', cardx: 'CardX', firstchoice: 'กรุงศรี เฟิร์สช้อยส์', aeon: 'อิออน', spaylater: 'SPayLater', lazpaylater: 'LazPayLater',
+  paynext: 'TrueMoney Pay Next', atome: 'Atome', grabpl: 'Grab PayLater', otherpl: 'อื่นๆ'};
+function actName(a) { return a.type === 'credit' && a.pl ? 'PayLater' : (ACT[a.type] || ''); }
 var TH_M = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 
 /* ---------- one-time setup ---------- */
@@ -204,11 +207,11 @@ function writeAccounts(ss, D) {
   D.accounts.forEach(function (a) {
     var v = Math.round((bal[a.id] || 0) * 100) / 100;
     if (a.type === 'credit') debt += -v; else cash += v;
-    out.push([a.name || '', ACT[a.type] || '', PROV[a.bank] || '', masked(a), v]);
+    out.push([a.name || '', actName(a), PROV[a.bank] || '', masked(a), v]);
   });
   out.push(['', '', '', '', '']);
-  out.push(['เงินทั้งหมด (ไม่รวมบัตรเครดิต)', '', '', '', Math.round(cash * 100) / 100]);
-  out.push(['หนี้บัตรเครดิต', '', '', '', Math.round(debt * 100) / 100]);
+  out.push(['เงินทั้งหมด (ไม่รวมบัตรเครดิต/PayLater)', '', '', '', Math.round(cash * 100) / 100]);
+  out.push(['หนี้บัตรเครดิต / PayLater', '', '', '', Math.round(debt * 100) / 100]);
   out.push(['สุทธิ', '', '', '', Math.round((cash - debt) * 100) / 100]);
   out.push(['อัปเดตล่าสุด', Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm'), '', '', '']);
   sh.getRange(1, 1, out.length, 5).setValues(out);
@@ -251,7 +254,7 @@ function writeMonth(ss, D, month) {
   ex.forEach(function (e) {
     var tr = e.cat === 'transport';
     ledger.push([e.date || '', e.time || '', e.reimb ? 'รายจ่าย (เบิกได้)' : 'รายจ่าย', CAT[e.cat] || 'อื่นๆ',
-      tr ? (MODE[e.mode] || '') : (e.sub || ''), e.note || '', e.amount === null || e.amount === undefined || e.amount === '' ? '' : -num(e.amount),
+      tr ? (MODE[e.mode] || '') : (e.sub || ''), (e.note || '') + (e.plan && e.plan.n > 1 ? ' [ผ่อน ' + e.plan.n + ' งวด × ' + e.plan.monthly + ']' : ''), e.amount === null || e.amount === undefined || e.amount === '' ? '' : -num(e.amount),
       an(e.acct), e.from || '', e.to || '', e.tTrainArr || '', e.tDepart || '', e.tArrive || '', mins(e.tDepart, e.tArrive),
       e.reimb ? (e.reimbDone ? 'เบิกแล้ว ' + e.reimbDone : 'รอเบิก') : '', '', '']);
   });
