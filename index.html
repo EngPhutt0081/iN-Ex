@@ -64,6 +64,11 @@ button:disabled{opacity:.5}
 .more-btn{width:36px;height:36px;border:1px solid var(--line-2);border-radius:50%;background:none;color:var(--muted);display:grid;place-items:center;padding:0;margin-left:4px}
 .more-btn svg{width:20px;height:20px;fill:currentColor}
 .more-btn[aria-pressed="true"]{color:var(--bone-ink);background:var(--bone);border-color:var(--bone)}
+.inv-link{display:flex;align-items:center;gap:12px;width:100%;border:1px solid var(--line-2);background:var(--surface);border-radius:16px;padding:12px 14px;margin:-6px 0 20px;text-align:left;color:inherit}
+.inv-link .im{flex:1;min-width:0}
+.inv-link .im b{display:block;font-weight:500}
+.inv-link .im small{color:var(--muted);font-size:12.5px}
+.inv-link .chev{color:var(--faint);font-size:18px}
 .more-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:22px}
 .more-card{border:1px solid var(--line-2);background:var(--surface);border-radius:18px;padding:16px 14px;text-align:left;display:flex;flex-direction:column;gap:10px;min-height:118px}
 .more-card .rd{align-self:flex-start}
@@ -407,7 +412,6 @@ td.open{color:var(--gold);cursor:pointer}
       <b id="mLabel"></b>
       <button id="mNext" aria-label="เดือนถัดไป">›</button>
     </div>
-    <button class="more-btn" id="moreBtn" type="button" aria-label="อื่นๆ"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
     </div>
   </header>
   <div id="notice" class="notice" hidden></div>
@@ -418,6 +422,7 @@ td.open{color:var(--gold);cursor:pointer}
         <button class="btn primary" id="addExpense"><span class="plus">+</span>ค่าใช้จ่าย</button>
         <button class="btn" id="addTransit"><span class="plus">+</span>เดินทาง</button>
       </div>
+      <button class="inv-link" id="goInvest" type="button"></button>
       <div id="nudgeArea"></div>
       <div id="dueArea"></div>
       <div id="liveArea"></div>
@@ -436,9 +441,9 @@ td.open{color:var(--gold);cursor:pointer}
   <div class="tabs-in" role="tablist">
     <button class="tab" role="tab" data-tab="log" aria-selected="true"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01" stroke-width="2.6"/></svg>รายการ</button>
     <button class="tab" role="tab" data-tab="income" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M16 14.5h2"/></svg>บัญชี</button>
-    <button class="tab" role="tab" data-tab="bills" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16M8.5 3v4M15.5 3v4M8 14h3M8 17h6"/></svg>บิล/ผ่อน</button>
     <button class="tab" role="tab" data-tab="sum" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></svg>สรุป</button>
-    <button class="tab" role="tab" data-tab="invest" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>ลงทุน</button>
+    <button class="tab" role="tab" data-tab="bills" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16M8.5 3v4M15.5 3v4M8 14h3M8 17h6"/></svg>บิล/ผ่อน</button>
+    <button class="tab" role="tab" data-tab="more" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/></svg>อื่นๆ</button>
   </div>
 </nav>
 
@@ -914,8 +919,10 @@ function subOf(e){
 function renderMonthBar(){const p=ym.split('-').map(Number);$('#mLabel').textContent=TH_M[p[1]-1]+' '+(p[0]+543);$('#monthBar').style.visibility=(tab==='more')?'hidden':'visible';}
 
 const openDays=new Set();let closedToday=false;
+function renderInvLink(){const el=$('#goInvest');if(!loaded){el.hidden=true;return;}el.hidden=false;const t=investTotals();const m=monthInvest();
+ el.innerHTML='<span class="rd" style="--c:#ECE8E1"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg></span><span class="im"><b>ลงทุน</b><small>'+(t.n?'พอร์ต ฿'+fmtB0(t.V)+' · ผลตอบแทน <span class="'+(t.R>0?'gain':t.R<0?'loss':'')+'">'+signed(t.R)+'</span>'+(m.buy?' · เดือนนี้ลงทุน ฿'+fmtB0(m.buy):''):'ยังไม่มีพอร์ต แตะเพื่อเริ่มบันทึกการลงทุน')+'</small></span><span class="chev">›</span>';}
 function renderLog(){
- const list=sortE(data.expenses.filter(inMonth));renderReimb();renderDue();renderLive();renderNudge();
+ const list=sortE(data.expenses.filter(inMonth));renderReimb();renderDue();renderLive();renderNudge();renderInvLink();
  const tot=list.filter(personal).reduce((s,e)=>s+(Number(e.amount)||0),0);
  const p=ym.split('-').map(Number);const isCur=ym===todayISO().slice(0,7);const days=isCur?new Date().getDate():new Date(p[0],p[1],0).getDate();
  const todayTot=data.expenses.filter(e=>e.date===todayISO()&&personal(e)).reduce((s,e)=>s+(Number(e.amount)||0),0);
@@ -991,6 +998,7 @@ function renderTransit(el){
 
 /* ---------- more menu ---------- */
 const MORE_ICON={
+ invest:'<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
  tax:'<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/>',
  transit:'<rect x="6" y="3" width="12" height="14" rx="3"/><path d="M6 11h12M9 21l1.5-4M15 21l-1.5-4"/>',
  fare:'<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M16 11h0M8 15h2M12 15h2M8 18h8"/>',
@@ -1009,7 +1017,9 @@ function renderMore(){
  const tr=data.expenses.filter(isTransit);let taxTxt='ยังไม่มีรายรับปีนี้';
  try{const r=taxYear(new Date().getFullYear(),false);if(r.count)taxTxt=r.due>0.5?'ต้องจ่ายเพิ่ม ≈ ฿'+fmtB0(r.due):r.due<-0.5?'น่าจะได้คืน ≈ ฿'+fmtB0(-r.due):'ไม่ต้องจ่ายเพิ่ม';}catch(e){}
  const card=(k,c,t,sub)=>'<button class="more-card" type="button" data-more="'+k+'"><span class="rd" style="--c:'+c+'"><svg viewBox="0 0 24 24">'+MORE_ICON[k]+'</svg></span><span><b>'+t+'</b><br><small>'+sub+'</small></span></button>';
+ const pv=investTotals();
  el.innerHTML='<h1 class="sub-title" style="margin-top:4px">อื่นๆ</h1><div class="more-grid">'+
+  card('invest','#ECE8E1','ลงทุน',pv.n?'พอร์ต ฿'+fmtB0(pv.V)+' · '+signed(pv.R):'หุ้น กองทุน แผนถอนทุน')+
   card('tax','#C9A46A','คำนวณภาษี',esc('ปี '+(new Date().getFullYear()+543)+' · '+taxTxt))+
   card('transit','#4C7DD1','ฐานข้อมูลการเดินทาง',tr.length+' เที่ยว · '+routeGroups().length+' เส้นทาง')+
   card('fare','#6C9FD6','คำนวณค่าโดยสาร','MRT สายสีน้ำเงิน ผู้ใหญ่')+
@@ -1118,6 +1128,7 @@ function goalLine(a,s){
  if(s.ready)return {tag:'<span class="tag gold">ถึงเป้า ถอนทุนได้</span>',pct:100,txt:'ขาย ฿'+fmtB0(s.atRisk)+' ได้ทุนคืนทั้งหมด'};
  return {tag:'<span class="tag">เป้าถอนทุน ×'+s.target+'</span>',pct,txt:'อีก ฿'+fmtB0(s.targetValue-s.value)+' (+'+(s.value?((s.targetValue/s.value-1)*100).toFixed(1):'–')+'%)'};
 }
+function investTotals(){let V=0,R=0;data.assets.forEach(a=>{const s=assetStats(a);V+=s.valueEff;R+=s.ret;});return {V,R,n:data.assets.length};}
 function renderInvest(){
  const el=$('#view-invest');
  if(!loaded){el.innerHTML='<div class="empty"><b>กำลังโหลด…</b></div>';return;}
@@ -1135,7 +1146,7 @@ function renderInvest(){
  else html+='<div class="items">'+assets.map(a=>{const s=stats[a.id];const g=goalLine(a,s);
   return '<button class="asset" data-asset="'+esc(a.id)+'"><div class="asset-top"><span style="min-width:0"><div class="asset-name">'+esc(a.name)+'</div><div class="asset-kind">'+esc(a.kind||'')+(s.units!=null?' · '+fmtU(s.units)+' หน่วย':'')+'</div></span><span class="asset-val">฿'+fmtB(s.valueEff)+'<small class="'+(s.ret>0?'gain':s.ret<0?'loss':'')+'">'+signed(s.ret)+' ('+signed(s.retPct,v=>v.toFixed(1))+'%)</small></span></div>'+
    '<div class="goal"><div class="track" style="--c:'+(s.ready||s.free?'var(--gold)':'var(--muted)')+'"><div style="width:'+g.pct.toFixed(1)+'%"></div></div><div class="goal-txt"><span>'+g.tag+'</span><span>'+esc(g.txt)+'</span></div></div></button>';}).join('')+'</div>';
- el.innerHTML=html;
+ el.innerHTML='<div class="sub-head"><button type="button" data-more="" aria-label="กลับไปเมนูอื่นๆ">‹ อื่นๆ</button></div><h1 class="sub-title">ลงทุน</h1>'+html;
 }
 
 function renderAll(){
@@ -1610,8 +1621,8 @@ function taxPlanHTML(r,y,proj){
 }
 
 const VIEWS=['log','income','bills','sum','invest','more'];let moreSub='';
-function setTab(name){if(name==='transit'){openMore('transit');return;}if(name!=='more')moreSub='';tab=name;$$('.tab').forEach(x=>x.setAttribute('aria-selected',String(x.dataset.tab===name)));$('#moreBtn').setAttribute('aria-pressed',String(name==='more'));VIEWS.forEach(t=>$('#view-'+t).hidden=t!==tab);renderAll();window.scrollTo(0,0);}
-function openMore(sub){moreSub=sub||'';setTab('more');}
+function setTab(name){if(name==='transit'){openMore('transit');return;}if(name!=='more')moreSub='';tab=name;$$('.tab').forEach(x=>x.setAttribute('aria-selected',String(x.dataset.tab===name||(name==='invest'&&x.dataset.tab==='more'))));VIEWS.forEach(t=>$('#view-'+t).hidden=t!==tab);renderAll();window.scrollTo(0,0);}
+function openMore(sub){if(sub==='invest'){setTab('invest');return;}moreSub=sub||'';setTab('more');}
 function openQuick(){
  const live=sortE(data.expenses.filter(isLive));
  $('#qlive').innerHTML=live.map(e=>{const st=tripStep(e);return '<button data-step="'+esc(e.id)+'|'+st[0]+'" data-fromquick="1">'+esc(st[1])+'<small>'+esc((e.from||'?')+' → '+(e.to||'?'))+' · กดเพื่อบันทึก '+nowHM()+'</small></button>';}).join('');
@@ -1992,7 +2003,7 @@ $('#mv-delete').onclick=async()=>{const b=$('#mv-delete');
 document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(!$('#mvsheet').hidden)closeMove();else if(!$('#acsheet').hidden&&$('#sheet').hidden&&$('#isheet').hidden&&$('#tsheet').hidden)closeAcct();});
 document.addEventListener('click',ev=>{
  const t=ev.target.closest('button');if(!t)return;const ds=t.dataset;
- if(t.id==='moreBtn'){openMore('');return;}
+ if(t.id==='goInvest'){setTab('invest');return;}
  if(ds.more!=null){openMore(ds.more);return;}
  if(ds.wk){wkOff=Math.min(0,wkOff+Number(ds.wk));renderAll();return;}
  if(t.id==='goDed'){const a=$('#d-life');if(a)a.closest('.panel').scrollIntoView({behavior:'smooth',block:'start'});return;}
