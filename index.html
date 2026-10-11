@@ -95,6 +95,20 @@ body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area
 .goal-card.done .prog > div{background:var(--gain)}
 .ghist{display:flex;justify-content:space-between;font-size:13px;padding:8px 0;border-bottom:1px solid var(--line);color:var(--muted)}
 .ghist b{font-family:var(--f-num);font-weight:400;color:var(--ink)}
+.recap-card{border:1px solid var(--line-2);background:var(--surface);border-radius:18px;padding:14px;margin:-8px 0 20px;display:flex;flex-direction:column;gap:10px}
+.recap-card .rt{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.recap-card .rt b{font-weight:500}
+.recap-card .rt small{color:var(--muted);font-size:12.5px}
+.recap-card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.55}
+.recap-card p b{color:var(--ink);font-weight:500}
+.recap-card .row2{gap:8px}
+.rc-big{font-family:var(--f-num);font-size:30px;font-weight:300}
+.rc-delta{font-family:var(--f-num);font-size:13px;margin-left:8px}
+.rc-list{display:flex;flex-direction:column}
+.rc-list > div{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+.rc-list > div span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rc-list > div span:last-child{font-family:var(--f-num);white-space:nowrap;color:var(--muted)}
+.rc-list > div span:last-child b{color:var(--ink);font-weight:400}
 .inv-link{display:flex;align-items:center;gap:12px;width:100%;border:1px solid var(--line-2);background:var(--surface);border-radius:16px;padding:12px 14px;margin:-6px 0 20px;text-align:left;color:inherit}
 .inv-link .im{flex:1;min-width:0}
 .inv-link .im b{display:block;font-weight:500}
@@ -461,6 +475,7 @@ td.open{color:var(--gold);cursor:pointer}
       <div id="nudgeArea"></div>
       <div id="dueArea"></div>
       <div id="budgetArea"></div>
+      <div id="recapArea"></div>
       <div id="liveArea"></div>
       <div id="reimbArea"></div>
       <div id="list"></div>
@@ -964,7 +979,7 @@ const openDays=new Set();let closedToday=false;
 function renderInvLink(){const el=$('#goInvest');if(!loaded){el.hidden=true;return;}el.hidden=false;const t=investTotals();const m=monthInvest();
  el.innerHTML='<span class="rd" style="--c:#ECE8E1"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg></span><span class="im"><b>ลงทุน</b><small>'+(t.n?'พอร์ต ฿'+fmtB0(t.V)+' · ผลตอบแทน <span class="'+(t.R>0?'gain':t.R<0?'loss':'')+'">'+signed(t.R)+'</span>'+(m.buy?' · เดือนนี้ลงทุน ฿'+fmtB0(m.buy):''):'ยังไม่มีพอร์ต แตะเพื่อเริ่มบันทึกการลงทุน')+'</small></span><span class="chev">›</span>';}
 function renderLog(){
- const list=sortE(data.expenses.filter(inMonth));renderReimb();renderDue();renderBudgetNudge();renderLive();renderNudge();renderInvLink();
+ const list=sortE(data.expenses.filter(inMonth));renderReimb();renderDue();renderBudgetNudge();renderRecapCard();renderLive();renderNudge();renderInvLink();
  const tot=list.filter(personal).reduce((s,e)=>s+(Number(e.amount)||0),0);
  const p=ym.split('-').map(Number);const isCur=ym===todayISO().slice(0,7);const days=isCur?new Date().getDate():new Date(p[0],p[1],0).getDate();
  const todayTot=data.expenses.filter(e=>e.date===todayISO()&&personal(e)).reduce((s,e)=>s+(Number(e.amount)||0),0);
@@ -996,6 +1011,7 @@ function renderSummary(){
  const maxV=rows.length?rows[0].v:1;
  let html='<div class="hero"><div class="label">ใช้จ่ายรวม '+TH_M[p[1]-1]+'</div><div class="big"><small>฿</small>'+fmtB(total)+'</div></div>'+
   '<div class="grid"><div><span class="label">รายรับสุทธิ</span><b>฿'+fmtB(incN)+'</b></div><div><span class="label">เหลือหลังจ่าย+ลงทุน</span><b class="'+(left<0?'loss':left>0?'gain':'')+'">'+signed(left)+'</b></div><div><span class="label">ลงทุนเดือนนี้</span><b>฿'+fmtB(inv.buy)+'</b></div><div><span class="label">เฉลี่ย/วัน</span><b>฿'+fmtB0(days?total/days:0)+'</b></div><div><span class="label">ค่าเดินทาง</span><b>฿'+fmtB(tr)+'</b></div><div><span class="label">สัดส่วนลงทุน</span><b>'+((total+inv.buy)?Math.round(inv.buy/(total+inv.buy)*100):0)+'%</b></div></div>';
+ html+='<button class="reimb-bar" id="recapOpen" data-k="'+ym+'" style="border-color:var(--line-2);background:var(--surface);margin:14px 0 0"><span>สรุป'+(isCur?'เดือนนี้ถึงวันนี้':'เดือน'+TH_M[p[1]-1])+' เทียบเดือนก่อน</span><span>ดู ›</span></button>';
  html+=budgetHTML();
  html+='<div class="h2">จ่ายไปกับอะไร<span>แตะหมวดเพื่อดูหมวดย่อย</span></div><div class="panel" style="padding-block:4px">';
  if(!rows.length)html+='<div style="color:var(--muted);padding:12px 0">ยังไม่มีข้อมูลเดือนนี้</div>';
@@ -1101,9 +1117,9 @@ function renderBudgetNudge(){const el=$('#budgetArea');if(!loaded||ym!==todayISO
  const r=hot[0];const txt=r?('งบ'+r.c.name+' '+(r.pct>=100?'เกินแล้ว ฿'+fmtB0(r.v-r.b):'ใช้ไป '+Math.round(r.pct)+'% เหลือ ฿'+fmtB0(r.b-r.v))+(hot.length>1?' · อีก '+(hot.length-1)+' หมวด':'')):('งบรวมใช้ไป '+Math.round(st.pct)+'%');
  el.innerHTML='<button class="reimb-bar" id="goBudget"'+(r&&r.pct>=100?' style="border-color:var(--loss)"':'')+'><span>'+esc(txt)+'</span><span>ดู ›</span></button>';}
 let xmode=null,xform=null;
-function openX(mode,f,title){xmode=mode;xform=f;$('#xTitle').textContent=title;renderX();$('#xsheet').hidden=false;lockBody(true);$('#xsheet').scrollTop=0;}
+function openX(mode,f,title){xmode=mode;xform=f;$('#xTitle').textContent=title;$('#xSave').style.visibility=mode==='recap'?'hidden':'';$('#xCancel').textContent=mode==='recap'?'ปิด':'ยกเลิก';renderX();$('#xsheet').hidden=false;lockBody(true);$('#xsheet').scrollTop=0;}
 function closeX(){$('#xsheet').hidden=true;xmode=null;xform=null;lockBody(false);}
-function renderX(){if(xmode==='budget')renderBudgetSheet();else if(xmode==='goal')renderGoalSheet();}
+function renderX(){if(xmode==='recap')$('#x-body').innerHTML=recapHTML(xform.K);else if(xmode==='budget')renderBudgetSheet();else if(xmode==='goal')renderGoalSheet();}
 function renderBudgetSheet(){const B=budgetOf();const avg=avgSpend();const f=xform;
  let h='<p class="insight" style="margin:0">ใส่งบต่อเดือนเฉพาะหมวดที่อยากคุม ตัวเลขจาง ๆ คือค่าเฉลี่ยที่ใช้จริง'+(Object.keys(avg).length?'':' (ยังไม่มีข้อมูลพอ)')+'</p>';
  h+='<label class="field"><span>งบรวมทั้งเดือน (ปล่อยว่าง = รวมจากทุกหมวด)</span><input id="bg-total" inputmode="decimal" autocomplete="off" placeholder="'+(Object.values(avg).length?'ปกติ ~'+fmtB0(Object.values(avg).reduce((s,v)=>s+v,0)):'เช่น 15000')+'" value="'+esc(f.total!=null?f.total:(Number((settings.budget||{}).total)>0?settings.budget.total:''))+'"></label>';
@@ -1145,6 +1161,52 @@ async function saveGoal(){readGoal();const f=xform;const name=(f.name||'').trim(
 async function goalMove(sign){readGoal();const f=xform;const v=numIn($('#g-amt').value);if(!(v>0)){toast('ใส่จำนวนเงิน');return;}
  const gs=(settings.goals||[]).slice();const i=gs.findIndex(x=>x.id===f.id);if(i<0)return;const g=Object.assign({},gs[i]);g.adds=(g.adds||[]).concat([{d:todayISO(),a:sign*v}]);gs[i]=g;
  try{await saveGoals(gs,(sign>0?'เติม ':'ถอน ')+'฿'+fmtB(v));f.adds=g.adds;renderGoalSheet();renderAll();}catch(e){}}
+
+/* ---------- monthly recap ---------- */
+function acctFlow(id,K){let v=0;const inK=d=>(d||'').startsWith(K);
+ data.expenses.forEach(e=>{if(e.acct===id&&inK(e.date))v-=Number(e.amount)||0;if(e.reimbDone&&e.reimbAcct===id&&inK(e.reimbDone))v+=Number(e.amount)||0;});
+ data.incomes.forEach(e=>{if(e.acct===id&&inK(e.date))v+=incNet(e);});
+ data.trades.forEach(t=>{if(t.acct===id&&inK(t.date))v+=t.type==='buy'?-(Number(t.amount)||0):(Number(t.amount)||0);});
+ data.moves.forEach(m=>{if(!inK(m.date))return;const a=Number(m.amount)||0;if(m.type==='transfer'){if(m.from===id)v-=a;if(m.to===id)v+=a;}else if(m.type==='adjust'&&m.account===id&&!/ยกมา/.test(m.note||''))v+=a;});
+ return r2(v);}
+function monthStats(K,upto){
+ const ok=d=>(d||'').startsWith(K)&&(!upto||Number((d||'').slice(8,10))<=upto);
+ const ex=data.expenses.filter(e=>ok(e.date)&&!e.reimb);const by={};let tot=0;
+ ex.forEach(e=>{const v=Number(e.amount)||0;const c=CAT[e.cat]?e.cat:'other';by[c]=(by[c]||0)+v;tot+=v;});
+ const inc=data.incomes.filter(e=>ok(e.date)).reduce((s,e)=>s+incNet(e),0);
+ let buy=0,div=0;data.trades.filter(t=>ok(t.date)).forEach(t=>{if(t.type==='buy')buy+=Number(t.amount)||0;else if(t.type==='div')div+=Number(t.amount)||0;});
+ const tr=ex.filter(isTransit);const ride=tr.map(e=>span(e.tDepart,e.tArrive)).filter(v=>v!=null&&v<300).reduce((s,v)=>s+v,0);
+ return {n:ex.length,tot:r2(tot),by,inc:r2(inc),buy:r2(buy),div:r2(div),trips:tr.length,ride,fare:r2(tr.reduce((s,e)=>s+(Number(e.amount)||0),0))};}
+const pctTxt=(a,b)=>{if(!(b>0))return '';const p=Math.round((a-b)/b*100);if(p>300)return '×'+(a/b).toFixed(1);return (p>=0?'+':'−')+Math.abs(p)+'%';};
+function recapData(K){const P=ymAdd(K,-1);const today=todayISO();const isCur=K===today.slice(0,7);const upto=isCur?Number(today.slice(8,10)):0;
+ const a=monthStats(K),b=monthStats(P,upto?Math.min(upto,dimOf(P)):0);
+ let saved=0;(settings.goals||[]).forEach(g=>{if(g.acct&&acctById(g.acct))saved+=acctFlow(g.acct,K);else(g.adds||[]).forEach(x=>{if((x.d||'').startsWith(K))saved+=Number(x.a)||0;});});
+ const cats=Object.keys(Object.assign({},a.by,b.by)).map(c=>({c:CAT[c],v:r2(a.by[c]||0),p:r2(b.by[c]||0)}));
+ return {K,P,isCur,upto,a,b,saved:r2(saved),cats};}
+function recapHTML(K){const R=recapData(K),a=R.a,b=R.b;const m=+K.slice(5,7),pm=+R.P.slice(5,7);
+ if(!a.n&&!a.inc)return '<div class="empty"><b>ยังไม่มีข้อมูลเดือน'+TH_M[m-1]+'</b>บันทึกรายการไปเรื่อย ๆ สรุปจะขึ้นที่นี่</div>';
+ const vs=R.isCur?'ช่วงเดียวกันของเดือน'+TH_M[pm-1]+' (1–'+R.upto+')':'เดือน'+TH_M[pm-1];
+ const d=a.tot-b.tot;const delta=b.tot>0?'<span class="rc-delta '+(d>0?'loss':'gain')+'">'+pctTxt(a.tot,b.tot)+' ('+(d>0?'+':'−')+'฿'+fmtB0(Math.abs(d))+')</span>':'';
+ let h='<div><div class="label">ใช้จ่ายส่วนตัว'+TH_M[m-1]+(R.isCur?' (ถึงวันนี้)':'')+'</div><div><span class="rc-big">฿'+fmtB(a.tot)+'</span>'+delta+'</div><small style="color:var(--muted)">'+(b.tot>0?'เทียบ'+vs+' ฿'+fmtB0(b.tot):'ยังไม่มีข้อมูลเดือนก่อนให้เทียบ')+' · '+a.n+' รายการ</small></div>';
+ const left=r2(a.inc-a.tot-a.buy);
+ h+='<div class="kv"><div><span class="label">รายรับสุทธิ</span><b>฿'+fmtB0(a.inc)+'</b></div><div><span class="label">เหลือหลังจ่าย+ลงทุน</span><b class="'+(left<0?'loss':left>0?'gain':'')+'">'+signed(left)+'</b></div><div><span class="label">ลงทุน</span><b>฿'+fmtB0(a.buy)+'</b></div><div><span class="label">เก็บเข้าเป้าหมาย</span><b>'+((settings.goals||[]).length?signed(R.saved):'–')+'</b></div></div>';
+ const top=R.cats.filter(x=>x.v>0).sort((x,y)=>y.v-x.v);
+ h+='<div class="h2" style="margin:6px 2px 0">หมวดที่จ่ายมากสุด<span>เทียบ'+(R.isCur?'ช่วงเดียวกัน':'เดือนก่อน')+'</span></div><div class="rc-list">'+top.slice(0,5).map(x=>'<div><span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+x.c.color+';margin-right:8px"></i>'+esc(x.c.name)+'</span><span><b>฿'+fmtB0(x.v)+'</b>'+(x.p>0?' <span class="'+(x.v>x.p?'loss':'gain')+'">'+pctTxt(x.v,x.p)+'</span>':' <span>ใหม่</span>')+'</span></div>').join('')+'</div>';
+ const ins=[];
+ if(b.tot>0){const up=R.cats.filter(x=>x.v-x.p>0).sort((x,y)=>(y.v-y.p)-(x.v-x.p))[0],dn=R.cats.filter(x=>x.p-x.v>0).sort((x,y)=>(y.p-y.v)-(x.p-x.v))[0];
+  if(up)ins.push('<b>'+esc(up.c.name)+'</b> เพิ่มขึ้นมากสุด +฿'+fmtB0(up.v-up.p));if(dn)ins.push('<b>'+esc(dn.c.name)+'</b> ลดลงมากสุด −฿'+fmtB0(dn.p-dn.v));}
+ const st=budgetState(K);if(st){const over=st.rows.filter(r=>r.pct>100);ins.push(over.length?'เกินงบ '+over.length+' หมวด: '+over.map(r=>esc(r.c.name)).join(', '):'ทุกหมวดอยู่ในงบ'+(st.left>=0?' เหลือ ฿'+fmtB0(st.left):''));}
+ if(a.trips)ins.push('เดินทาง '+a.trips+' เที่ยว'+(a.ride?' บนรถรวม '+(a.ride>=60?Math.floor(a.ride/60)+' ชม. '+(a.ride%60)+' นาที':a.ride+' นาที'):'')+' ค่ารถ ฿'+fmtB0(a.fare));
+ if(a.div)ins.push('ได้ปันผล ฿'+fmtB0(a.div));
+ const days=R.isCur?R.upto:dimOf(K);ins.push('เฉลี่ยวันละ ฿'+fmtB0(days?a.tot/days:0));
+ h+='<div class="h2" style="margin:6px 2px 0">ข้อสังเกต</div><div class="panel" style="display:flex;flex-direction:column;gap:6px">'+ins.map(t=>'<p class="insight" style="margin:0">• '+t+'</p>').join('')+'</div>';
+ h+='<button class="btn wide" type="button" id="recapGo" data-k="'+K+'">ดูหน้าสรุปของเดือน'+TH_M[m-1]+'</button>';
+ return h;}
+function renderRecapCard(){const el=$('#recapArea');const today=todayISO();const P=ymAdd(today.slice(0,7),-1);
+ let off=false;try{off=localStorage.getItem('inex-recap-'+P)==='1';}catch(e){}
+ if(!loaded||ym!==today.slice(0,7)||Number(today.slice(8,10))>14||off){el.innerHTML='';return;}
+ const R=recapData(P);if(!R.a.n){el.innerHTML='';return;}const a=R.a,b=R.b;const top=R.cats.filter(x=>x.v>0).sort((x,y)=>y.v-x.v)[0];
+ el.innerHTML='<div class="recap-card"><div class="rt"><b>สรุปเดือน'+TH_M[+P.slice(5,7)-1]+'</b><small>เทียบเดือนก่อนหน้า</small></div><p>ใช้ไป <b>฿'+fmtB0(a.tot)+'</b>'+(b.tot>0?' <span class="'+(a.tot>b.tot?'loss':'gain')+'">'+pctTxt(a.tot,b.tot)+'</span>':'')+(top?' · จ่ายกับ<b>'+esc(top.c.name)+'</b>มากสุด':'')+(a.inc?' · เหลือ '+signed(r2(a.inc-a.tot-a.buy)):'')+'</p><div class="row2"><button class="btn" type="button" id="recapHide">ปิด</button><button class="btn primary" type="button" id="recapOpen" data-k="'+P+'">ดูสรุป</button></div></div>';}
 
 /* ---------- bills & installments ---------- */
 const addDays=(s,n)=>{const d=parseD(s);d.setDate(d.getDate()+n);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());};
@@ -2130,6 +2192,9 @@ document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(!$('#mvshe
 document.addEventListener('click',ev=>{
  const t=ev.target.closest('button');if(!t)return;const ds=t.dataset;
  if(t.id==='goInvest'){setTab('invest');return;}
+ if(t.id==='recapOpen'){const K=ds.k;openX('recap',{K},'สรุปเดือน'+TH_M[+K.slice(5,7)-1]+' '+(+K.slice(0,4)+543));return;}
+ if(t.id==='recapHide'){try{localStorage.setItem('inex-recap-'+ymAdd(todayISO().slice(0,7),-1),'1');}catch(e){}renderRecapCard();return;}
+ if(t.id==='recapGo'){ym=ds.k;closeX();setTab('sum');return;}
  if(ds.fav!=null){saveFav(+ds.fav);return;}
  if(t.id==='editBudget'){openX('budget',{},'งบรายเดือน');return;}
  if(t.id==='goBudget'){setTab('sum');return;}
