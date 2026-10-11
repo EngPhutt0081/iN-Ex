@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0E1012">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -55,6 +55,10 @@ button:disabled{opacity:.5}
 .label{font-size:12px;color:var(--muted);letter-spacing:.04em}
 
 /* header */
+html,body{touch-action:pan-x pan-y;-webkit-user-select:none;user-select:none}
+button,a,label,summary,.chip,.tab,input,select,textarea{touch-action:manipulation}
+input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:text}
+input,select,textarea{font-size:max(16px,1em)}
 body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:8;pointer-events:none}
 .top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:14px 8px;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .brand{display:flex;align-items:center;gap:10px;font-family:var(--f-display);font-weight:600;font-size:15px;letter-spacing:.06em}
@@ -2336,6 +2340,8 @@ document.addEventListener('click',ev=>{
  if(t.id==='syncDot'||t.id==='notice'){if(!sync.url||t.id==='notice'){openMore('data');}else{flush().then(()=>toast(syncStatusText()));}return;}
 });
 document.addEventListener('change',e=>{if(e.target.id==='autoQuick'){try{localStorage.setItem('inex-autoquick',e.target.checked?'1':'0');}catch(er){}toast(e.target.checked?'เปิดแอปแล้วจะแสดงเมนูทันที':'ปิดการแสดงเมนูอัตโนมัติแล้ว');}});
+['gesturestart','gesturechange','gestureend'].forEach(t=>document.addEventListener(t,e=>e.preventDefault(),{passive:false}));
+document.addEventListener('touchmove',e=>{if(e.touches&&e.touches.length>1)e.preventDefault();},{passive:false});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});}
 renderAll();
 initStore().then(()=>{
