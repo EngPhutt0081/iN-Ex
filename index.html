@@ -444,6 +444,76 @@ td.open{color:var(--gold);cursor:pointer}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--bone);color:var(--bone-ink);padding:10px 16px;border-radius:99px;font-size:13.5px;font-weight:500;max-width:calc(100% - 32px);text-align:center}
 @media (min-width:640px){.grid.g4{grid-template-columns:repeat(4,1fr)}}
 </style>
+<style>
+/* ---------- kcal (Body) mode: same graphite theme, lime highlight ---------- */
+:root{--lime:#C9F24A;--lime-ink:#0E1012;--lime-soft:#1B2110}
+.mode-btn{flex:none;border:1px solid var(--lime);background:none;color:var(--lime);border-radius:99px;font-family:var(--f-num);font-size:12.5px;line-height:1.2;padding:7px 10px;min-width:44px;margin-right:2px}
+@media (max-width:440px){body:not(.mode-body) .brand > span{display:none}}
+.mode-body .mode-btn{border-color:var(--line-2);color:var(--ink);font-size:15px;padding:5px 14px}
+.mode-body .top-r::before{content:"แคลอรี่";font-family:var(--f-display);font-size:13px;color:var(--lime);margin-right:10px;letter-spacing:.04em}
+.mode-body .app > main,.mode-body nav.tabs:not(.b-tabs),.mode-body #fab,.mode-body #monthBar{display:none!important}
+.b-tabs .tabs-in{align-items:center}
+.btab{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px 4px;font-size:11px;color:var(--faint);position:relative}
+.btab svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.btab[aria-selected="true"]{color:var(--ink)}
+.btab[aria-selected="true"]::after{content:"";position:absolute;bottom:-2px;width:4px;height:4px;border-radius:50%;background:var(--lime)}
+.b-grid small{display:block;font-size:11.5px;color:var(--muted);line-height:1.35}
+.b-add{justify-self:center;width:52px;height:52px;border-radius:16px;border:0;background:var(--lime);color:var(--lime-ink);display:grid;place-items:center;padding:0}
+.b-add svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round}
+.b-save{background:var(--lime);color:var(--lime-ink)}
+.b-dnav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:2px 0 6px}
+.b-dnav button{border:0;background:none;color:var(--muted);width:40px;height:40px;font-size:20px;border-radius:50%}
+.b-dnav button:disabled{opacity:.25}
+.b-dnav b{font-family:var(--f-display);font-weight:500;font-size:15px}
+.b-dnav small{display:block;text-align:center;color:var(--muted);font-size:12px}
+.b-hero{display:flex;gap:16px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:16px;margin-bottom:12px}
+.b-ring{flex:none;width:138px;height:138px}
+.b-ring text{font-family:var(--f-num)}
+.b-hero .kv2{display:flex;flex-direction:column;gap:9px;flex:1;min-width:0}
+.b-hero .kv2 div{display:flex;flex-direction:column}
+.b-hero .kv2 span{font-size:12px;color:var(--muted)}
+.b-hero .kv2 b{font-family:var(--f-num);font-weight:400;font-size:17px}
+.b-lime{color:var(--lime)!important}
+.b-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.b-card.lime{border-color:var(--lime);background:var(--lime-soft)}
+.b-wrow{display:flex;gap:8px;align-items:center;margin-top:10px}
+.b-wrow input{flex:1;min-width:0;font-family:var(--f-num);font-size:20px;border:1px solid var(--line-2);background:var(--bg);border-radius:12px;padding:9px 12px}
+.b-wrow button,.b-btn{border:0;border-radius:12px;background:var(--lime);color:var(--lime-ink);font-weight:600;padding:12px 16px;white-space:nowrap}
+.b-meal{margin-top:6px}
+.b-meal h4{margin:14px 2px 4px;font-family:var(--f-display);font-weight:500;font-size:13px;color:var(--muted);display:flex;justify-content:space-between}
+.b-meal h4 b{font-family:var(--f-num);font-weight:400}
+.b-item{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:none;padding:11px 2px;min-height:48px}
+.b-item span{min-width:0;display:flex;flex-direction:column}
+.b-item span b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.b-item small{color:var(--muted);font-size:12px}
+.b-item > b{font-family:var(--f-num);font-weight:400;white-space:nowrap}
+.b-input{width:100%;font-size:19px;border:1.5px solid var(--lime);background:var(--surface);border-radius:16px;padding:14px 16px;outline:none}
+.b-prev{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.b-prev .ln{display:flex;justify-content:space-between;gap:12px;font-size:14px}
+.b-prev .ln span{min-width:0;color:var(--ink)}
+.b-prev .ln em{font-style:normal;color:var(--faint);font-size:11px;margin-left:6px;font-family:var(--f-num)}
+.b-prev .ln b{font-family:var(--f-num);font-weight:400;white-space:nowrap}
+.b-prev .tot{border-top:1px solid var(--line-2);padding-top:10px;margin-top:2px;align-items:baseline}
+.b-prev .tot b{font-size:24px;color:var(--lime)}
+.b-tag{display:inline-block;font-size:11px;border-radius:6px;padding:1px 7px;background:var(--lime);color:var(--lime-ink);font-weight:600}
+.b-tag.mid{background:none;border:1px solid var(--gold);color:var(--gold)}
+.b-tag.none{background:none;border:1px solid var(--loss);color:var(--loss)}
+.b-sugg{display:flex;gap:7px;flex-wrap:wrap}
+.b-chart{width:100%;height:auto;display:block}
+.b-chart text{font-family:var(--f-num);font-size:10px;fill:var(--faint)}
+.b-legend{display:flex;gap:16px;font-size:11.5px;color:var(--muted);margin-top:6px}
+.b-legend i{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--faint);margin-right:6px;vertical-align:middle}
+.b-legend i.l{width:14px;height:3px;border-radius:2px;background:var(--lime)}
+.b-seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:3px}
+.b-seg button{border:0;background:none;padding:9px 4px;border-radius:11px;color:var(--muted);font-size:13.5px;line-height:1.3}
+.b-seg button small{display:block;font-family:var(--f-num);font-size:11px;opacity:.85}
+.b-seg button[aria-pressed="true"]{background:var(--lime);color:var(--lime-ink);font-weight:600}
+.b-chip[aria-pressed="true"]{background:var(--lime-soft);border-color:var(--lime);color:var(--ink)}
+.b-db{display:flex;flex-direction:column}
+.b-src{font-size:12px;color:var(--muted);line-height:1.6}
+.b-src a{color:var(--muted)}
+.b-over{color:var(--loss)!important}
+</style>
 </head>
 <body>
 
@@ -456,6 +526,7 @@ td.open{color:var(--gold);cursor:pointer}
 
 </defs><polygon points="300.0,170.0 362.0,232.0 300.0,294.0 238.0,232.0" fill="url(#mkg)"/><polygon points="250.0,350.0 350.0,350.0 350.0,560.0 250.0,590.0" fill="url(#mkg)"/><polygon points="250.0,620.0 350.0,590.0 350.0,860.0 250.0,860.0" fill="url(#mkg)"/><polygon points="432.0,188.0 530.0,188.0 530.0,860.0 432.0,860.0" fill="url(#mkb)"/><polygon points="552.0,188.0 840.0,188.0 790.0,284.0 552.0,284.0" fill="url(#mkb)"/><polygon points="552.0,476.0 770.0,476.0 730.0,566.0 552.0,566.0" fill="url(#mkg)"/><polygon points="552.0,764.0 790.0,764.0 840.0,860.0 552.0,860.0" fill="url(#mkb)"/></svg><span>iN&amp;Ex</span><button class="sync-dot off" id="syncDot" type="button" aria-label="สถานะซิงก์"></button></div>
     <div class="top-r">
+    <button class="mode-btn" id="modeBtn" type="button" data-modesw="body" aria-label="สลับไปโหมดแคลอรี่">kcal</button>
     <div class="month" id="monthBar">
       <button id="mPrev" aria-label="เดือนก่อนหน้า">‹</button>
       <b id="mLabel"></b>
@@ -486,6 +557,33 @@ td.open{color:var(--gold);cursor:pointer}
     <section id="view-more" hidden></section>
     <section id="view-invest" hidden></section>
   </main>
+  <div id="bodyMain" hidden>
+    <section id="bview-today"></section>
+    <section id="bview-trend" hidden></section>
+    <section id="bview-food" hidden></section>
+    <section id="bview-goal" hidden></section>
+  </div>
+</div>
+
+<nav class="tabs b-tabs" id="bodyTabs" aria-label="เมนู kcal" hidden>
+  <div class="tabs-in">
+    <button class="btab" data-btab="today" aria-selected="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 8 8"/></svg>วันนี้</button>
+    <button class="btab" data-btab="trend" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 18l5-6 4 3 7-9"/></svg>แนวโน้ม</button>
+    <button class="b-add" id="bAdd" type="button" aria-label="เพิ่มอาหาร น้ำหนัก หรือออกกำลังกาย"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button class="btab" data-btab="food" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h9"/></svg>เมนูอาหาร</button>
+    <button class="btab" data-btab="goal" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>เป้าหมาย</button>
+  </div>
+</nav>
+
+<!-- kcal: quick add -->
+<div id="bqsheet" class="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="bqTitle">
+  <div class="sheet-head"><button class="ghost" id="bqCancel" type="button">ยกเลิก</button><h2 id="bqTitle">เพิ่มด่วน</h2><button class="save b-save" id="bqSave" type="button">บันทึก</button></div>
+  <div class="sheet-body" id="bq-body"></div>
+</div>
+<!-- kcal: weight / edit entry -->
+<div id="bxsheet" class="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="bxTitle">
+  <div class="sheet-head"><button class="ghost" id="bxCancel" type="button">ยกเลิก</button><h2 id="bxTitle"></h2><button class="save b-save" id="bxSave" type="button">บันทึก</button></div>
+  <div class="sheet-body" id="bx-body"></div>
 </div>
 
 <nav class="tabs" aria-label="เมนูหลัก">
@@ -663,6 +761,7 @@ td.open{color:var(--gold);cursor:pointer}
     <h3>เพิ่มรายการ</h3>
     <div class="qgrid">
       <button class="qbtn" data-quick="transit"><span class="rd" style="--c:#6C9FD6"><svg viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="14" rx="3"/><path d="M6 11h12M9 21l1.5-4M15 21l-1.5-4"/></svg></span><span>เดินทาง<small>สถานี เวลา ค่ารถ</small></span></button>
+      <button class="qbtn" data-bodyquick="1" type="button"><span class="rd" style="--c:#C9F24A"><svg viewBox="0 0 24 24"><path d="M7 3v7M5 3v4a2 2 0 0 0 4 0V3M7 10v11M17 21V3c-2.2 1-3.5 4-3.5 8H17"/></svg></span><span>อาหาร + kcal<small>พิมพ์ทีเดียว ลงเงินและแคล</small></span></button>
       <button class="qbtn" data-quick="expense"><span class="rd" style="--c:#D9895A"><svg viewBox="0 0 24 24"><path d="M5 8h14l-1.2 12H6.2zM9 8V6.5a3 3 0 0 1 6 0V8"/></svg></span><span>ค่าใช้จ่าย<small>ของกิน ของใช้ บิล</small></span></button>
       <button class="qbtn" data-quick="reimb"><span class="rd" style="--c:#C9A46A"><svg viewBox="0 0 24 24"><rect x="3.5" y="7.5" width="17" height="12" rx="2"/><path d="M9 7.5V5h6v2.5M3.5 13h17"/></svg></span><span>สำรองจ่ายงาน<small>เบิกคืนได้</small></span></button>
       <button class="qbtn" data-quick="income"><span class="rd" style="--c:#73C394"><svg viewBox="0 0 24 24"><path d="M12 3v11M7.5 9.5L12 14l4.5-4.5M4 14v5h16v-5"/></svg></span><span>รายรับ<small>เงินเดือน งานพิเศษ</small></span></button>
@@ -856,7 +955,7 @@ async function pull(){
  const pend=new Set(outbox.map(o=>o.c+'|'+o.id));const dirty=new Set();let changed=false;
  for(const r of (j.docs||[])){
   const k=r.c+'|'+r.id;if(pend.has(k))continue;
-  if(r.c==='meta'){if(r.id==='settings'&&!r.deleted&&r.doc){settings=r.doc;if(!settings.customSubs)settings.customSubs={};kvSet('settings',settings);changed=true;}continue;}
+  if(r.c==='meta'){if(r.id==='settings'&&!r.deleted&&r.doc){settings=r.doc;if(!settings.customSubs)settings.customSubs={};kvSet('settings',settings);changed=true;}else if(String(r.id).startsWith('body:')&&window.BODY){window.BODY.applyRemote(r);}continue;}
   if(!data[r.c])continue;
   const i=data[r.c].findIndex(x=>x.id===r.id);
   if(r.deleted){if(i>=0){data[r.c].splice(i,1);dirty.add(r.c);}}
@@ -908,6 +1007,7 @@ async function connectSync(btn){
   sync.sheetUrl=j.sheetUrl||'';if(changedTarget)sync.last=0;
   COLL_ALL.forEach(c=>data[c].forEach(d=>enqueue(c,d.id,'put',bodyOf(d))));
   if(settings&&Object.keys(settings).length)enqueue('meta','settings','put',settings);
+  if(window.BODY)window.BODY.enqueueAll();
   AUTO_DRIVE=true;syncEditing=false;saveSync();$('#notice').hidden=true;toast('เชื่อมต่อแล้ว กำลังซิงก์');
   await flush();renderAll();
  }catch(e){Object.assign(sync,prev);saveSync();toast('เชื่อมต่อไม่ได้: '+((e&&e.message)||e));btn.disabled=false;btn.textContent='เชื่อมต่อ';}
@@ -2256,7 +2356,7 @@ function backupHTML(){
 async function doBackup(btn){
  const dl=DL;
  if(!dl){toast('ส่งออกไฟล์ไม่ได้ในหน้าจอนี้');return;}
- const payload={app:'samutjai',version:1,exportedAt:new Date().toISOString(),settings,data:{}};COLLS.forEach(c=>payload.data[c]=data[c]);
+ const payload={app:'samutjai',version:1,exportedAt:new Date().toISOString(),settings,data:{}};COLLS.forEach(c=>payload.data[c]=data[c]);if(window.BODY)payload.body=window.BODY.exportData();
  btn.disabled=true;
  try{await dl.save({filename:'ledger-backup-'+todayISO()+'.json',data:JSON.stringify(payload)});
   try{await store.saveSettings(Object.assign({},settings,{lastBackup:todayISO()}));}catch(e){}
@@ -2269,6 +2369,7 @@ async function doRestore(btn){
  try{
   for(const c of COLLS){for(const doc of (j.data[c]||[])){if(!doc||!doc.id)continue;const body=Object.assign({},doc);delete body.id;await store.put(c,doc.id,body);done++;if(done%25===0)toast('กำลังกู้คืน '+done+' รายการ…');}}
   if(j.settings&&typeof j.settings==='object')await store.saveSettings(Object.assign({},settings,j.settings));
+  if(j.body&&window.BODY)done+=await window.BODY.importData(j.body);
   pendingRestore=null;toast('กู้คืนครบ '+done+' รายการ');renderAll();
  }catch(e){toast('กู้คืนได้ '+done+' รายการแล้วหยุด: '+errText(e));btn.disabled=false;}
 }
@@ -2412,9 +2513,21 @@ renderAll();
 initStore().then(()=>{
  const d=lsGet(DRAFT_KEY);
  if(d&&!d.id&&(d.amount||d.note||d.from||d.tTrainArr||d.tDepart)){openSheet(Object.assign(blankForm(''),d),d.cat==='transport'?'บันทึกการเดินทาง':'ค่าใช้จ่ายใหม่');toast('เปิดรายการที่ยังไม่ได้บันทึกต่อ');}
- else if(!handleHash()&&autoQuickOn())openQuick();
+ else if(!handleHash()&&autoQuickOn()&&!(window.BODY&&window.BODY.active()))openQuick();
 });
+/* ---------- bridge for the Body (calorie) mode: read-only helpers + the same store.add path the expense form uses ---------- */
+window.INEX={
+ ready:()=>new Promise(r=>{const c=()=>loaded?r():setTimeout(c,40);c();}),
+ kvGet,kvSet,enqueue,toast,esc,todayISO,nowHM,fmtB,guess,closeQuick,
+ accounts:()=>sortedAccts().map(a=>({id:a.id,name:a.name,color:actOf(a).color})),
+ defaultFoodAcct:()=>defaultExpAcct('food'),
+ foodSubs:()=>subsFor('food'),
+ expenseById:id=>{const e=data.expenses.find(x=>x.id===id);return e?{id:e.id,amount:e.amount,note:e.note,date:e.date}:null;},
+ addExpense:async d=>{const x={date:d.date,time:d.time||'',amount:d.amount,note:String(d.note||'').trim(),cat:'food',createdAt:Date.now(),updatedAt:Date.now()};if(d.sub)x.sub=d.sub;if(d.acct&&acctById(d.acct))x.acct=d.acct;return store.add('expenses',x);}
+};
 })();
 </script>
+<script src="body-engine.js?v=1"></script>
+<script src="body.js?v=1"></script>
 </body>
 </html>
