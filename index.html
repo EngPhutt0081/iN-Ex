@@ -514,6 +514,7 @@ td.open{color:var(--gold);cursor:pointer}
 .b-src a{color:var(--muted)}
 .b-over{color:var(--loss)!important}
 </style>
+<link rel="stylesheet" href="todo.css?v=1">
 </head>
 <body>
 
@@ -910,7 +911,7 @@ const newId=()=>'l'+Date.now().toString(36)+Math.random().toString(36).slice(2,6
 let outbox=[];
 const sync={url:'',key:'',last:0,sheetUrl:'',status:'idle',err:'',lastOk:0};
 let syncEditing=false;
-const saveSync=()=>kvSet('sync',{url:sync.url,key:sync.key,last:sync.last,sheetUrl:sync.sheetUrl,lastOk:sync.lastOk});
+const saveSync=()=>kvSet('sync',{url:sync.url,key:sync.key,last:sync.last,sheetUrl:sync.sheetUrl,lastOk:sync.lastOk,lastDrive:sync.lastDrive||''});
 function enqueue(c,id,op,doc){outbox=outbox.filter(o=>!(o.c===c&&o.id===id));outbox.push({c,id,op,doc:doc||null,t:Date.now()+Math.random()});kvSet('outbox',outbox);renderSyncDot();scheduleFlush();}
 const bodyOf=d=>{const b=Object.assign({},d);delete b.id;return b;};
 const store={
@@ -955,14 +956,14 @@ async function pull(){
  const pend=new Set(outbox.map(o=>o.c+'|'+o.id));const dirty=new Set();let changed=false;
  for(const r of (j.docs||[])){
   const k=r.c+'|'+r.id;if(pend.has(k))continue;
-  if(r.c==='meta'){if(r.id==='settings'&&!r.deleted&&r.doc){settings=r.doc;if(!settings.customSubs)settings.customSubs={};kvSet('settings',settings);changed=true;}else if(String(r.id).startsWith('body:')&&window.BODY){window.BODY.applyRemote(r);}continue;}
+  if(r.c==='meta'){if(r.id==='settings'&&!r.deleted&&r.doc){settings=r.doc;if(!settings.customSubs)settings.customSubs={};kvSet('settings',settings);changed=true;}else if(String(r.id).startsWith('body:')&&window.BODY){window.BODY.applyRemote(r);}else if(String(r.id).startsWith('todo:')&&window.TODO){window.TODO.applyRemote(r);}continue;}
   if(!data[r.c])continue;
   const i=data[r.c].findIndex(x=>x.id===r.id);
   if(r.deleted){if(i>=0){data[r.c].splice(i,1);dirty.add(r.c);}}
   else if(r.doc){const row=Object.assign({id:r.id},r.doc);if(i>=0)data[r.c][i]=row;else data[r.c].push(row);dirty.add(r.c);}
  }
  dirty.forEach(c=>kvSet('c:'+c,data[c]));
- if(j.serverTs)sync.last=j.serverTs;if(j.sheetUrl)sync.sheetUrl=j.sheetUrl;
+ if(j.serverTs)sync.last=j.serverTs;if(j.sheetUrl)sync.sheetUrl=j.sheetUrl;if(j.lastBackup)sync.lastDrive=j.lastBackup;
  if(dirty.size||changed){if(form)syncSubs();renderAll();runRecurring();}
 }
 function syncStatusText(){
@@ -985,7 +986,9 @@ function syncHTML(){
  if(on&&!syncEditing){
   h+='<p class="insight" style="margin:0">บันทึกอะไรในแอป ข้อมูลจะเข้า Google Sheet ภายในไม่กี่วินาทีเมื่อมีเน็ต ตอนออฟไลน์ก็บันทึกได้ตามปกติ แอปจะส่งตามให้เองเมื่อกลับมาออนไลน์ ใน Sheet มีแท็บบัญชี และแท็บรายเดือน</p>';
   if(sync.sheetUrl)h+='<a class="btn primary wide" href="'+esc(sync.sheetUrl)+'" target="_blank" rel="noopener">เปิด Google Sheet</a>';
-  h+='<button class="btn wide" id="syncNow" type="button">ซิงก์ตอนนี้</button><button class="ghost" id="syncEdit" type="button">เปลี่ยนการเชื่อมต่อ</button>';
+  h+='<button class="btn wide" id="syncNow" type="button">ซิงก์ตอนนี้</button>';
+  h+='<button class="btn wide" id="driveBackup" type="button">สำรองไป Google Drive ตอนนี้</button><p class="insight" style="margin:0">'+(sync.lastDrive?'สำรองไป Drive ล่าสุด '+esc(sync.lastDrive)+' · ':'')+'Google สำรองทั้ง Sheet ให้ทุกคืนเอง (เก็บย้อนหลัง 30 วัน) ไม่ต้องเปิดแอป</p>';
+  h+='<button class="ghost" id="syncEdit" type="button">เปลี่ยนการเชื่อมต่อ</button>';
  }else{
   h+='<p class="insight" style="margin:0">ใส่ Web app URL และรหัสลับจาก Google Sheet ที่ตั้งค่าไว้ (ดูวิธีใน README) ระหว่างยังไม่เชื่อม ข้อมูลจะเก็บในเครื่องนี้ก่อน เชื่อมเมื่อไหร่ แอปจะส่งข้อมูลที่บันทึกไว้ขึ้นให้ทั้งหมด</p>'+
    '<label class="field"><span>Web app URL</span><input id="sy-url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec" value="'+esc(sync.url||'')+'"></label>'+
@@ -1008,6 +1011,7 @@ async function connectSync(btn){
   COLL_ALL.forEach(c=>data[c].forEach(d=>enqueue(c,d.id,'put',bodyOf(d))));
   if(settings&&Object.keys(settings).length)enqueue('meta','settings','put',settings);
   if(window.BODY)window.BODY.enqueueAll();
+  if(window.TODO)window.TODO.enqueueAll();
   AUTO_DRIVE=true;syncEditing=false;saveSync();$('#notice').hidden=true;toast('เชื่อมต่อแล้ว กำลังซิงก์');
   await flush();renderAll();
  }catch(e){Object.assign(sync,prev);saveSync();toast('เชื่อมต่อไม่ได้: '+((e&&e.message)||e));btn.disabled=false;btn.textContent='เชื่อมต่อ';}
@@ -2356,7 +2360,7 @@ function backupHTML(){
 async function doBackup(btn){
  const dl=DL;
  if(!dl){toast('ส่งออกไฟล์ไม่ได้ในหน้าจอนี้');return;}
- const payload={app:'samutjai',version:1,exportedAt:new Date().toISOString(),settings,data:{}};COLLS.forEach(c=>payload.data[c]=data[c]);if(window.BODY)payload.body=window.BODY.exportData();
+ const payload={app:'samutjai',version:1,exportedAt:new Date().toISOString(),settings,data:{}};COLLS.forEach(c=>payload.data[c]=data[c]);if(window.BODY)payload.body=window.BODY.exportData();if(window.TODO)payload.todo=window.TODO.exportData();
  btn.disabled=true;
  try{await dl.save({filename:'ledger-backup-'+todayISO()+'.json',data:JSON.stringify(payload)});
   try{await store.saveSettings(Object.assign({},settings,{lastBackup:todayISO()}));}catch(e){}
@@ -2370,6 +2374,7 @@ async function doRestore(btn){
   for(const c of COLLS){for(const doc of (j.data[c]||[])){if(!doc||!doc.id)continue;const body=Object.assign({},doc);delete body.id;await store.put(c,doc.id,body);done++;if(done%25===0)toast('กำลังกู้คืน '+done+' รายการ…');}}
   if(j.settings&&typeof j.settings==='object')await store.saveSettings(Object.assign({},settings,j.settings));
   if(j.body&&window.BODY)done+=await window.BODY.importData(j.body);
+  if(j.todo&&window.TODO)done+=await window.TODO.importData(j.todo);
   pendingRestore=null;toast('กู้คืนครบ '+done+' รายการ');renderAll();
  }catch(e){toast('กู้คืนได้ '+done+' รายการแล้วหยุด: '+errText(e));btn.disabled=false;}
 }
@@ -2386,7 +2391,7 @@ document.addEventListener('change',async e=>{
  if(e.target.id!=='restoreFile')return;
  const file=e.target.files&&e.target.files[0];e.target.value='';if(!file)return;
  try{const j=JSON.parse(await file.text());if(!j||j.app!=='samutjai'||!j.data)throw new Error('bad');
-  pendingRestore=j;const n=COLLS.reduce((a,c)=>a+((j.data[c]||[]).length),0);
+  pendingRestore=j;const n=COLLS.reduce((a,c)=>a+((j.data[c]||[]).length),0)+(j.todo?['tasks','jobs','logs'].reduce((a,k)=>a+((j.todo[k]||[]).length),0):0);
   const box=$('#restoreBox');box.hidden=false;
   box.innerHTML='<div class="plan ready"><p>ไฟล์สำรองวันที่ <b>'+esc(shortDate(String(j.exportedAt||'').slice(0,10)))+'</b> มี <b>'+n+'</b> รายการ ข้อมูลในไฟล์จะเขียนทับรายการเดียวกันในแอป ส่วนรายการที่ไม่มีในไฟล์จะยังอยู่</p><button class="btn primary" id="restoreGo" type="button">กู้คืน '+n+' รายการ</button></div>';
  }catch(err){toast('ไฟล์นี้ไม่ใช่ไฟล์สำรองของแอปนี้');}
@@ -2501,10 +2506,18 @@ document.addEventListener('click',ev=>{
  const t=ev.target.closest('button,#notice');if(!t)return;
  if(t.id==='syncConnect'){connectSync(t);return;}
  if(t.id==='syncNow'){flush().then(()=>toast(syncStatusText()));return;}
+ if(t.id==='driveBackup'){driveBackup(t);return;}
  if(t.id==='syncEdit'){syncEditing=true;renderAll();return;}
  if(t.id==='syncCancel'){syncEditing=false;renderAll();return;}
  if(t.id==='syncDot'||t.id==='notice'){if(!sync.url||t.id==='notice'){openMore('data');}else{flush().then(()=>toast(syncStatusText()));}return;}
 });
+async function driveBackup(btn){
+ if(!sync.url){toast('ยังไม่ได้เชื่อม Google Sheet');return;}
+ if(navigator.onLine===false){toast('ต้องต่อเน็ตก่อน');return;}
+ btn.disabled=true;btn.textContent='กำลังสำรองไป Drive…';
+ try{await flush();const j=await api({action:'backup'});sync.lastDrive=j.at||'';saveSync();toast('สำรองไป Drive แล้ว · '+(j.name||''));renderAll();}
+ catch(e){const m=String((e&&e.message)||e);toast(/unknown action/.test(m)?'ต้องอัปเดต Code.gs ใน Google Sheet ก่อน (ดูวิธีใน README)':'สำรองไม่สำเร็จ: '+m);btn.disabled=false;btn.textContent='สำรองไป Google Drive ตอนนี้';}
+}
 document.addEventListener('change',e=>{if(e.target.id==='autoQuick'){try{localStorage.setItem('inex-autoquick',e.target.checked?'1':'0');}catch(er){}toast(e.target.checked?'เปิดแอปแล้วจะแสดงเมนูทันที':'ปิดการแสดงเมนูอัตโนมัติแล้ว');}});
 ['gesturestart','gesturechange','gestureend'].forEach(t=>document.addEventListener(t,e=>e.preventDefault(),{passive:false}));
 document.addEventListener('touchmove',e=>{if(e.touches&&e.touches.length>1)e.preventDefault();},{passive:false});
@@ -2513,7 +2526,7 @@ renderAll();
 initStore().then(()=>{
  const d=lsGet(DRAFT_KEY);
  if(d&&!d.id&&(d.amount||d.note||d.from||d.tTrainArr||d.tDepart)){openSheet(Object.assign(blankForm(''),d),d.cat==='transport'?'บันทึกการเดินทาง':'ค่าใช้จ่ายใหม่');toast('เปิดรายการที่ยังไม่ได้บันทึกต่อ');}
- else if(!handleHash()&&autoQuickOn()&&!(window.BODY&&window.BODY.active()))openQuick();
+ else if(!handleHash()&&autoQuickOn()&&!(window.BODY&&window.BODY.active())&&!(window.TODO&&window.TODO.active()))openQuick();
 });
 /* ---------- bridge for the Body (calorie) mode: read-only helpers + the same store.add path the expense form uses ---------- */
 window.INEX={
@@ -2528,6 +2541,7 @@ window.INEX={
 })();
 </script>
 <script src="body-engine.js?v=1"></script>
-<script src="body.js?v=1"></script>
+<script src="body.js?v=2"></script>
+<script src="todo.js?v=1"></script>
 </body>
 </html>

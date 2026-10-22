@@ -118,6 +118,7 @@
 
   /* ---------- mode & tabs ---------- */
   function setMode(m) {
+    if (m === 'body' && window.TODO) window.TODO.leave(true);
     mode = m;
     document.body.classList.toggle('mode-body', m === 'body');
     $('#bodyMain').hidden = m !== 'body';
@@ -521,7 +522,7 @@
   window.addEventListener('hashchange', handleHash);
 
   window.BODY = {
-    applyRemote, enqueueAll, exportData, importData, openQuick,
+    applyRemote, enqueueAll, exportData, importData, openQuick, setMode,
     active: () => { try { return localStorage.getItem('inex-mode') === 'body'; } catch (e) { return false; } },
   };
 

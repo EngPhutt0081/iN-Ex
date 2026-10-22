@@ -4,10 +4,17 @@
  * 1) เลือกฟังก์ชัน setup แล้วกด Run (อนุญาตสิทธิ์ครั้งแรก)
  * 2) Deploy > New deployment > Web app > Execute as: Me, Who has access: Anyone > Deploy
  * 3) คัดลอก Web app URL และรหัสลับจากแท็บ "ตั้งค่า" ไปใส่ในแอป
+ * 4) (สำรองทุกคืน) เลือกฟังก์ชัน setupBackup แล้วกด Run ครั้งเดียว — Google จะก๊อปทั้ง Sheet
+ *    ไปไว้ในโฟลเดอร์ "iN&Ex Backup" บน Drive ทุกคืนหลังเที่ยงคืน เก็บย้อนหลัง 30 วัน
+ * v2: แท็บ "งาน" และ "ประวัติเอกสาร" (โหมด To Do) + สำรองไป Drive
  */
 var DATA = '_data';
 var ACC = 'บัญชี';
 var SET = 'ตั้งค่า';
+var TASKS = 'งาน';
+var DOCLOG = 'ประวัติเอกสาร';
+var KEEP_DAYS = 30;
+var BACKUP_PREFIX = 'iN&Ex สำรอง ';
 var COLLS = ['expenses', 'incomes', 'accounts', 'moves', 'assets', 'trades', 'meta'];
 
 var CAT = {food: 'อาหาร/เครื่องดื่ม', transport: 'เดินทาง', housing: 'ที่พัก', bills: 'บิล/ค่าน้ำไฟ', shopping: 'ของใช้/ช้อปปิ้ง',
@@ -61,7 +68,9 @@ function setup() {
     var x = ss.getSheetByName(n);
     if (x && ss.getSheets().length > 1 && x.getLastRow() === 0) ss.deleteSheet(x);
   });
-  rebuild(ss, readAll(d), {}, true);
+  var all = readAll(d);
+  rebuild(ss, all, {}, true);
+  writeTodo(ss, all);
   Logger.log('SECRET: ' + key);
 }
 
@@ -81,9 +90,10 @@ function doPost(e) {
     var ss = SpreadsheetApp.getActive();
     var sh = ss.getSheetByName(DATA);
     if (!sh) return out({ok: false, error: 'ยังไม่ได้รัน setup'});
-    if (body.action === 'ping') return out({ok: true, sheetUrl: ss.getUrl()});
+    if (body.action === 'ping') return out({ok: true, ver: 2, sheetUrl: ss.getUrl(), lastBackup: lastBackup()});
     if (body.action === 'push') return out(push(ss, sh, body.ops || []));
     if (body.action === 'pull') return out(pull(ss, sh, Number(body.since) || 0));
+    if (body.action === 'backup') { var b = backupNow(); b.ok = true; return out(b); }
     return out({ok: false, error: 'unknown action'});
   } finally {
     lock.releaseLock();
@@ -108,8 +118,10 @@ function push(ss, sh, ops) {
   var now = Math.max(Date.now(), last + 1);
   var months = {};
   var count = 0;
+  var todo = false;
   ops.forEach(function (o) {
     if (!o || COLLS.indexOf(o.c) < 0 || !o.id) return;
+    if (o.c === 'meta' && String(o.id).indexOf('todo:') === 0) todo = true;
     var k = o.c + '|' + o.id;
     var del = o.op === 'del';
     var json = del ? '' : JSON.stringify(o.doc || {});
@@ -130,6 +142,7 @@ function push(ss, sh, ops) {
     sh.getRange(2, 1, rows.length, 5).setValues(rows);
   }
   rebuild(ss, rows, months, true);
+  if (todo) writeTodo(ss, rows);
   return {ok: true, applied: count, serverTs: now, sheetUrl: ss.getUrl()};
 }
 
@@ -146,7 +159,7 @@ function pull(ss, sh, since) {
       docs.push({c: r[0], id: String(r[1]), deleted: !!r[3], doc: doc});
     }
   });
-  return {ok: true, docs: docs, serverTs: max, sheetUrl: ss.getUrl()};
+  return {ok: true, docs: docs, serverTs: max, sheetUrl: ss.getUrl(), lastBackup: lastBackup()};
 }
 
 /* ---------- readable tabs ---------- */
@@ -314,4 +327,130 @@ function writeMonth(ss, D, month) {
     sh.getRange(start + 1, 7, ledger.length, 1).setNumberFormat('#,##0.00;[Red]-#,##0.00');
   }
   sh.autoResizeColumns(1, head.length);
+}
+
+/* ---------- To Do: readable tabs "งาน" and "ประวัติเอกสาร" (built from meta docs todo:*) ---------- */
+var AREA = {mea: 'MEA', study: 'เรียน', me: 'ส่วนตัว'};
+var REPEAT = {d: 'ทุกวัน', w: 'ทุกสัปดาห์', m: 'ทุกเดือน'};
+var LOGK = {send: 'ส่งเอกสาร', back: 'ได้เอกสารคืน', step: 'เสร็จขั้น', open: 'เปิดงาน', close: 'ปิดงาน', reopen: 'เปิดงานอีกครั้ง'};
+
+function collectTodo(rows) {
+  var T = {t: [], j: [], l: []};
+  rows.forEach(function (r) {
+    if (r[0] !== 'meta' || r[3]) return;
+    var id = String(r[1]);
+    if (id.indexOf('todo:') !== 0) return;
+    id = id.slice(5);
+    var k = id.split(':')[0];
+    if (!T[k]) return;
+    try { var d = JSON.parse(r[4]); d.id = id; T[k].push(d); } catch (err) {}
+  });
+  return T;
+}
+
+function sheetFresh(ss, name) {
+  var sh = ss.getSheetByName(name) || ss.insertSheet(name);
+  sh.clear();
+  return sh;
+}
+
+function writeTodo(ss, rows) {
+  var T = collectTodo(rows);
+  if (!T.t.length && !T.j.length && !ss.getSheetByName(TASKS)) return;
+  var job = {};
+  T.j.forEach(function (j) { job[j.id] = j; });
+  var stepOf = function (j, i) { var s = j && j.steps && j.steps[Number(i)]; return s ? s.n : ''; };
+  var W = 12;
+  var padRow = function (a) { while (a.length < W) a.push(''); return a; };
+
+  var out = [padRow(['อัปเดตล่าสุด', Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm')]), padRow([])];
+  var jobHead = out.length;
+  out.push(padRow(['งาน MEA', 'เลขที่', 'ขั้นปัจจุบัน', 'ความคืบหน้า', 'เอกสารอยู่ที่', 'ตามงานวันที่', 'สถานะ']));
+  T.j.slice().sort(function (a, b) { return (a.closed ? 1 : 0) - (b.closed ? 1 : 0) || (a.created || 0) - (b.created || 0); }).forEach(function (j) {
+    var steps = j.steps || [];
+    var done = j.closed ? steps.length : Math.min(Number(j.cur) || 0, steps.length);
+    out.push(padRow([j.name || '', j.ref || '', steps.length ? (Number(j.cur) + 1) + '. ' + stepOf(j, j.cur) : '', done + '/' + steps.length,
+      j.wait ? (j.holder || '') : 'เรา', j.wait ? (j.follow || '') : '', j.closed ? 'ปิดแล้ว ' + j.closed : 'เปิดอยู่']));
+  });
+  out.push(padRow([]));
+  var taskHead = out.length;
+  out.push(['สถานะ', 'หมวด', 'ชื่องาน', 'งาน MEA', 'ขั้นตอน', 'กำหนดส่ง', 'เวลา', 'สำคัญ', 'ทำซ้ำ', 'งานย่อย', 'หมายเหตุ', 'เสร็จเมื่อ']);
+  T.t.slice().sort(function (a, b) {
+    if (!!a.done !== !!b.done) return a.done ? 1 : -1;
+    if (a.done) return String(b.doneAt || '').localeCompare(String(a.doneAt || ''));
+    return String(a.due || '9999').localeCompare(String(b.due || '9999')) || String(a.time || '99').localeCompare(String(b.time || '99'));
+  }).forEach(function (t) {
+    var j = t.job ? job[t.job] : null;
+    var subs = t.subs || [];
+    out.push([t.done ? 'เสร็จ' : 'ค้าง', AREA[t.area] || '', t.title || '', j ? j.name : '', j ? stepOf(j, t.step) : '', t.due || '', t.time || '',
+      t.imp ? 'สำคัญ' : '', REPEAT[t.rep] || '', subs.length ? subs.filter(function (s) { return s.ok; }).length + '/' + subs.length + ' · ' + subs.map(function (s) { return (s.ok ? '✓ ' : '• ') + s.x; }).join(', ') : '',
+      t.note || '', t.doneAt || '']);
+  });
+  var sh = sheetFresh(ss, TASKS);
+  sh.getRange(1, 1, out.length, W).setNumberFormat('@');
+  sh.getRange(1, 1, out.length, W).setValues(out);
+  sh.getRange(1, 1).setFontWeight('bold');
+  sh.getRange(jobHead + 1, 1, 1, 7).setFontWeight('bold');
+  sh.getRange(taskHead + 1, 1, 1, W).setFontWeight('bold');
+  sh.autoResizeColumns(1, W);
+
+  var L = [['วันที่', 'เวลา', 'งาน MEA', 'ขั้นตอน', 'เหตุการณ์', 'จาก', 'ถึง', 'หมายเหตุ']];
+  T.l.slice().sort(function (a, b) { return String((b.d || '') + (b.tm || '')).localeCompare(String((a.d || '') + (a.tm || ''))); }).forEach(function (l) {
+    var j = job[l.job];
+    L.push([l.d || '', l.tm || '', j ? j.name : '(ลบงานแล้ว)', j ? stepOf(j, l.step) : '', LOGK[l.kind] || l.kind || '', l.from || '', l.to || '', l.text || '']);
+  });
+  var lg = sheetFresh(ss, DOCLOG);
+  lg.getRange(1, 1, L.length, 8).setNumberFormat('@');
+  lg.getRange(1, 1, L.length, 8).setValues(L);
+  lg.getRange(1, 1, 1, 8).setFontWeight('bold');
+  lg.setFrozenRows(1);
+  lg.autoResizeColumns(1, 8);
+}
+
+/* ---------- nightly backup: copy the whole Sheet into Drive folder "iN&Ex Backup", keep 30 days ---------- */
+function lastBackup() { return PropertiesService.getScriptProperties().getProperty('LAST_BACKUP') || ''; }
+
+function backupFolder() {
+  var props = PropertiesService.getScriptProperties();
+  var id = props.getProperty('BACKUP_FOLDER');
+  if (id) {
+    try { var f = DriveApp.getFolderById(id); if (!f.isTrashed()) return f; } catch (err) {}
+  }
+  var folder = DriveApp.createFolder('iN&Ex Backup');
+  props.setProperty('BACKUP_FOLDER', folder.getId());
+  return folder;
+}
+
+function backupNow() {
+  var ss = SpreadsheetApp.getActive();
+  var folder = backupFolder();
+  var at = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm');
+  var name = BACKUP_PREFIX + at;
+  var copy = DriveApp.getFileById(ss.getId()).makeCopy(name, folder);
+  var cutoff = Date.now() - KEEP_DAYS * 864e5;
+  var removed = 0;
+  var it = folder.getFiles();
+  while (it.hasNext()) {
+    var f = it.next();
+    if (f.getId() !== copy.getId() && f.getName().indexOf(BACKUP_PREFIX) === 0 && f.getDateCreated().getTime() < cutoff) { f.setTrashed(true); removed++; }
+  }
+  PropertiesService.getScriptProperties().setProperty('LAST_BACKUP', at);
+  return {name: name, url: copy.getUrl(), at: at, folderUrl: folder.getUrl(), removed: removed};
+}
+
+function nightlyBackup() {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(60000);
+  try { backupNow(); } finally { lock.releaseLock(); }
+}
+
+/* Run once from the editor: schedules nightlyBackup every night 00:00–01:00 Bangkok time and makes the first copy now. */
+function setupBackup() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'nightlyBackup') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('nightlyBackup').timeBased().everyDays(1).atHour(0).nearMinute(15).inTimezone('Asia/Bangkok').create();
+  var ss = SpreadsheetApp.getActive();
+  var d = ss.getSheetByName(DATA);
+  if (d) writeTodo(ss, readAll(d));
+  var r = backupNow();
+  Logger.log('ตั้งเวลาสำรองทุกคืนแล้ว · สำรองครั้งแรก: ' + r.name + ' · โฟลเดอร์: ' + r.folderUrl);
 }
