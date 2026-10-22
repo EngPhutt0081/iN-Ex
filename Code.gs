@@ -7,6 +7,8 @@
  * 4) (สำรองทุกคืน) เลือกฟังก์ชัน setupBackup แล้วกด Run ครั้งเดียว — ทุกคืนหลังเที่ยงคืน Google จะอัปเดต
  *    ไฟล์สำรองของเดือนนั้นในโฟลเดอร์ "iN&Ex Backup" บน Drive (เดือนละ 1 ไฟล์ เช่น "iN&Ex สำรอง 2026-10")
  * v2: แท็บ "งาน" และ "ประวัติเอกสาร" (โหมด To Do) + สำรองไป Drive
+ * v3: ส่งกำหนดส่งเข้า Google Calendar + อีเมลสรุปเช้า (ตั้งค่าในแอป → ตั้งค่า → แจ้งเตือน)
+ *     หลังวางโค้ดใหม่ ให้รันฟังก์ชัน setupAll ครั้งเดียว แล้ว Deploy → Manage deployments → New version
  */
 var DATA = '_data';
 var ACC = 'บัญชี';
@@ -94,6 +96,7 @@ function doPost(e) {
     if (body.action === 'push') return out(push(ss, sh, body.ops || []));
     if (body.action === 'pull') return out(pull(ss, sh, Number(body.since) || 0));
     if (body.action === 'backup') { var b = backupNow(false); b.ok = true; return out(b); }
+    if (body.action === 'digest') { var m = sendDigest(true); m.ok = true; return out(m); }
     return out({ok: false, error: 'unknown action'});
   } finally {
     lock.releaseLock();
@@ -118,10 +121,11 @@ function push(ss, sh, ops) {
   var now = Math.max(Date.now(), last + 1);
   var months = {};
   var count = 0;
-  var todo = false;
+  var todo = false, life = false, lifeSet = false;
   ops.forEach(function (o) {
     if (!o || COLLS.indexOf(o.c) < 0 || !o.id) return;
     if (o.c === 'meta' && String(o.id).indexOf('todo:') === 0) todo = true;
+    if (o.c === 'meta' && String(o.id).indexOf('life:') === 0) { life = true; if (o.id === 'life:settings') lifeSet = true; }
     var k = o.c + '|' + o.id;
     var del = o.op === 'del';
     var json = del ? '' : JSON.stringify(o.doc || {});
@@ -143,6 +147,8 @@ function push(ss, sh, ops) {
   }
   rebuild(ss, rows, months, true);
   if (todo) writeTodo(ss, rows);
+  if (todo || life) PropertiesService.getScriptProperties().setProperty('CAL_DIRTY', '1');
+  if (lifeSet) { try { rescheduleDigest(notifySettings(rows)); } catch (err) {} }
   return {ok: true, applied: count, serverTs: now, sheetUrl: ss.getUrl()};
 }
 
@@ -332,7 +338,12 @@ function writeMonth(ss, D, month) {
 /* ---------- To Do: readable tabs "งาน" and "ประวัติเอกสาร" (built from meta docs todo:*) ---------- */
 var AREA = {mea: 'MEA', study: 'เรียน', me: 'ส่วนตัว'};
 var REPEAT = {d: 'ทุกวัน', w: 'ทุกสัปดาห์', m: 'ทุกเดือน'};
-var LOGK = {send: 'ส่งเอกสาร', back: 'ได้เอกสารคืน', step: 'เสร็จขั้น', open: 'เปิดงาน', close: 'ปิดงาน', reopen: 'เปิดงานอีกครั้ง'};
+var LOGK = {send: 'ส่งเอกสาร', back: 'ได้เอกสารคืน', step: 'เสร็จขั้น', open: 'เปิดงาน', close: 'ปิดงาน', reopen: 'เปิดงานอีกครั้ง', pay: 'งวดงาน'};
+function nextPayText(j) {
+  var ps = j.pays || [];
+  for (var i = 0; i < ps.length; i++) if (!ps[i].pd) return (ps[i].n || ('งวด ' + (i + 1))) + (ps[i].due ? ' · ' + ps[i].due : '') + (ps[i].dl ? (ps[i].ac ? ' · รอเบิกจ่าย' : ' · รอตรวจรับ') : '');
+  return ps.length ? 'ครบทุกงวด' : '';
+}
 
 function collectTodo(rows) {
   var T = {t: [], j: [], l: []};
@@ -365,12 +376,13 @@ function writeTodo(ss, rows) {
 
   var out = [padRow(['อัปเดตล่าสุด', Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm')]), padRow([])];
   var jobHead = out.length;
-  out.push(padRow(['งาน MEA', 'เลขที่', 'ขั้นปัจจุบัน', 'ความคืบหน้า', 'เอกสารอยู่ที่', 'ตามงานวันที่', 'สถานะ']));
+  out.push(padRow(['งาน MEA', 'เลขที่', 'ขั้นปัจจุบัน', 'ความคืบหน้า', 'เอกสารอยู่ที่', 'ตามงานวันที่', 'สถานะ', 'ผู้รับจ้าง', 'สิ้นสุดสัญญา', 'งวดถัดไป']));
   T.j.slice().sort(function (a, b) { return (a.closed ? 1 : 0) - (b.closed ? 1 : 0) || (a.created || 0) - (b.created || 0); }).forEach(function (j) {
     var steps = j.steps || [];
     var done = j.closed ? steps.length : Math.min(Number(j.cur) || 0, steps.length);
     out.push(padRow([j.name || '', j.ref || '', steps.length ? (Number(j.cur) + 1) + '. ' + stepOf(j, j.cur) : '', done + '/' + steps.length,
-      j.wait ? (j.holder || '') : 'เรา', j.wait ? (j.follow || '') : '', j.closed ? 'ปิดแล้ว ' + j.closed : 'เปิดอยู่']));
+      j.wait ? (j.holder || '') : 'เรา', j.wait ? (j.follow || '') : '', j.closed ? 'ปิดแล้ว ' + j.closed : 'เปิดอยู่',
+      (j.ct && j.ct.contractor) || '', (j.ct && j.ct.end) || '', nextPayText(j)]));
   });
   out.push(padRow([]));
   var taskHead = out.length;
@@ -390,14 +402,14 @@ function writeTodo(ss, rows) {
   sh.getRange(1, 1, out.length, W).setNumberFormat('@');
   sh.getRange(1, 1, out.length, W).setValues(out);
   sh.getRange(1, 1).setFontWeight('bold');
-  sh.getRange(jobHead + 1, 1, 1, 7).setFontWeight('bold');
+  sh.getRange(jobHead + 1, 1, 1, 10).setFontWeight('bold');
   sh.getRange(taskHead + 1, 1, 1, W).setFontWeight('bold');
   sh.autoResizeColumns(1, W);
 
   var L = [['วันที่', 'เวลา', 'งาน MEA', 'ขั้นตอน', 'เหตุการณ์', 'จาก', 'ถึง', 'หมายเหตุ']];
   T.l.slice().sort(function (a, b) { return String((b.d || '') + (b.tm || '')).localeCompare(String((a.d || '') + (a.tm || ''))); }).forEach(function (l) {
     var j = job[l.job];
-    L.push([l.d || '', l.tm || '', j ? j.name : '(ลบงานแล้ว)', j ? stepOf(j, l.step) : '', LOGK[l.kind] || l.kind || '', l.from || '', l.to || '', l.text || '']);
+    L.push([l.d || '', l.tm || '', j ? j.name : '(ลบงานแล้ว)', j ? stepOf(j, l.step) : '', LOGK[l.kind] || l.kind || '', l.from || '', l.to || '', l.text || l.what || '']);
   });
   var lg = sheetFresh(ss, DOCLOG);
   lg.getRange(1, 1, L.length, 8).setNumberFormat('@');
@@ -491,13 +503,250 @@ function nightlyBackup() {
   try { backupNow(true); } finally { lock.releaseLock(); }
 }
 
-/* Run once from the editor: schedules nightlyBackup every night 00:00–01:00 Bangkok time and backs up this month now. */
-function setupBackup() {
-  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'nightlyBackup') ScriptApp.deleteTrigger(t); });
+/* Run ONCE from the editor after pasting this code (asks for Drive, Calendar, Gmail and trigger permissions):
+   nightly backup 00:00–01:00, calendar check every 10 minutes, morning email at the hour set in the app. */
+function setupAll() {
+  var keep = ['nightlyBackup', 'calTick', 'digestTick'];
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (keep.indexOf(t.getHandlerFunction()) >= 0) ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('nightlyBackup').timeBased().everyDays(1).atHour(0).nearMinute(15).inTimezone('Asia/Bangkok').create();
+  ScriptApp.newTrigger('calTick').timeBased().everyMinutes(10).create();
   var ss = SpreadsheetApp.getActive();
   var d = ss.getSheetByName(DATA);
-  if (d) writeTodo(ss, readAll(d));
+  var rows = d ? readAll(d) : [];
+  if (d) writeTodo(ss, rows);
+  var set = notifySettings(rows);
+  rescheduleDigest(set);
   var r = backupNow(false);
-  Logger.log('ตั้งเวลาสำรองทุกคืนแล้ว · ไฟล์เดือนนี้: ' + r.name + ' · โฟลเดอร์: ' + r.folderUrl);
+  var c = syncCalendar();
+  Logger.log('สำรองทุกคืน: ตั้งแล้ว · ไฟล์เดือนนี้ ' + r.name + ' · โฟลเดอร์ ' + r.folderUrl);
+  Logger.log('ปฏิทิน: ' + (set.cal.on ? 'ส่ง ' + c.count + ' รายการเข้าปฏิทิน “' + CAL_NAME + '”' : 'ปิดอยู่ (เปิดได้ในแอป → ตั้งค่า → แจ้งเตือน)'));
+  Logger.log('อีเมลสรุปเช้า: ' + (set.mail.on ? 'ทุก' + (set.mail.days === 'all' ? 'วัน' : 'วันจันทร์–ศุกร์') + ' ประมาณ ' + set.mail.time + ' น. ส่งถึง ' + Session.getEffectiveUser().getEmail() : 'ปิดอยู่'));
+}
+function setupBackup() { setupAll(); }
+
+/* ---------- v3: notifications (Google Calendar + morning email), settings come from the app as meta "life:settings" ---------- */
+var CAL_NAME = 'iN&Ex งาน';
+var CAL_MAP = '_cal';
+var TZ = 'Asia/Bangkok';
+
+function notifySettings(rows) {
+  var def = {cal: {on: true, due: true, follow: true, contract: true, renew: true, impOnly: false, m0730: true, d1: true},
+    mail: {on: true, time: '07:00', days: 'weekdays', today: true, follow: true, contract: true, money: true, kcal: false}};
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i][0] === 'meta' && String(rows[i][1]) === 'life:settings' && !rows[i][3]) {
+      try {
+        var s = JSON.parse(rows[i][4]) || {}; var n = s.notify || {};
+        Object.keys(n.cal || {}).forEach(function (k) { def.cal[k] = n.cal[k]; });
+        Object.keys(n.mail || {}).forEach(function (k) { def.mail[k] = n.mail[k]; });
+      } catch (err) {}
+    }
+  }
+  return def;
+}
+
+function collectMeta(rows, prefix) {
+  var out = {};
+  rows.forEach(function (r) {
+    if (r[0] !== 'meta' || r[3]) return;
+    var id = String(r[1]); if (id.indexOf(prefix) !== 0) return;
+    id = id.slice(prefix.length); var k = id.split(':')[0];
+    try { var d = JSON.parse(r[4]); d.id = id; (out[k] = out[k] || []).push(d); } catch (err) {}
+  });
+  return out;
+}
+
+function ymd(d) { return Utilities.formatDate(d, TZ, 'yyyy-MM-dd'); }
+function addDaysStr(s, n) { var d = Utilities.parseDate(s + ' 12:00', TZ, 'yyyy-MM-dd HH:mm'); return ymd(new Date(d.getTime() + n * 864e5)); }
+function daysBetween(a, b) { return Math.round((Utilities.parseDate(b + ' 12:00', TZ, 'yyyy-MM-dd HH:mm') - Utilities.parseDate(a + ' 12:00', TZ, 'yyyy-MM-dd HH:mm')) / 864e5); }
+function addMonthsStr(s, n) { var p = s.split('-').map(Number); var d = new Date(Date.UTC(p[0], p[1] - 1 + n, 1)); var last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate(); return d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + Math.min(p[2], last)).slice(-2); }
+function warrantyEndStr(j) {
+  var wy = Number(j.ct && j.ct.wy) || 0; var ps = j.pays || []; var last = ps.length ? ps[ps.length - 1] : null;
+  return wy && last && last.dl ? addMonthsStr(last.dl, 12 * wy) : '';
+}
+
+function calItems(rows, set) {
+  var T = collectMeta(rows, 'todo:'); var Lf = collectMeta(rows, 'life:');
+  var today = ymd(new Date()); var min = addDaysStr(today, -1), max = addDaysStr(today, 400);
+  var ok = function (d) { return d && d >= min && d <= max; };
+  var items = [];
+  var jobs = {}; (T.j || []).forEach(function (j) { jobs[j.id] = j; });
+  if (set.due) (T.t || []).forEach(function (t) {
+    if (t.done || !ok(t.due) || (set.impOnly && !t.imp)) return;
+    var j = t.job && jobs[t.job];
+    items.push({key: 't:' + t.id, title: (t.area === 'mea' ? '[MEA] ' : '') + t.title, date: t.due, time: t.time || '', desc: (j ? 'งาน MEA: ' + j.name + '\n' : '') + (t.note || '')});
+  });
+  (T.j || []).forEach(function (j) {
+    if (j.closed) return;
+    if (set.follow && j.wait && ok(j.follow)) items.push({key: 'f:' + j.id + ':' + j.follow, title: 'ตามเอกสาร: รอ' + (j.holder || '') + ' · ' + j.name, date: j.follow, time: ''});
+    if (!set.contract) return;
+    (j.pays || []).forEach(function (p, i) { if (!p.dl && ok(p.due)) items.push({key: 'p:' + j.id + ':' + i, title: 'งวดงาน: ' + (p.n || 'งวด ' + (i + 1)) + ' · ' + j.name, date: p.due, time: ''}); });
+    if (j.ct && ok(j.ct.end)) items.push({key: 'e:' + j.id, title: 'ครบสัญญา: ' + j.name, date: j.ct.end, time: '', early: 7});
+  });
+  if (set.contract) (T.j || []).forEach(function (j) { var we = warrantyEndStr(j); if (ok(we)) items.push({key: 'w:' + j.id, title: 'ครบประกันผลงาน: ' + j.name, date: we, time: '', early: 7}); });
+  if (set.renew) (Lf.r || []).forEach(function (r) { if (ok(r.exp)) items.push({key: 'r:' + r.id + ':' + r.exp, title: 'หมดอายุ: ' + r.t, date: r.exp, time: '', early: 7}); });
+  return items;
+}
+
+function getCal(create) {
+  var props = PropertiesService.getScriptProperties(); var id = props.getProperty('CAL_ID');
+  if (id) { try { var c = CalendarApp.getCalendarById(id); if (c) return c; } catch (err) {} }
+  if (!create) return null;
+  var found = CalendarApp.getCalendarsByName(CAL_NAME);
+  var cal = found && found.length ? found[0] : CalendarApp.createCalendar(CAL_NAME, {color: CalendarApp.Color.ORANGE});
+  props.setProperty('CAL_ID', cal.getId());
+  return cal;
+}
+
+function readCalMap(ss) {
+  var sh = ss.getSheetByName(CAL_MAP); var map = {};
+  if (!sh) return map;
+  var n = sh.getLastRow(); if (n < 1) return map;
+  sh.getRange(1, 1, n, 3).getValues().forEach(function (r) { if (r[0]) map[String(r[0])] = {id: String(r[1]), h: String(r[2])}; });
+  return map;
+}
+function writeCalMap(ss, map) {
+  var sh = ss.getSheetByName(CAL_MAP);
+  if (!sh) { sh = ss.insertSheet(CAL_MAP); sh.hideSheet(); }
+  sh.clear();
+  var keys = Object.keys(map);
+  if (keys.length) { sh.getRange(1, 1, keys.length, 3).setNumberFormat('@'); sh.getRange(1, 1, keys.length, 3).setValues(keys.map(function (k) { return [k, map[k].id, map[k].h]; })); }
+}
+
+function makeEvent(cal, it, set) {
+  var ev;
+  var at = function (d, hm) { return Utilities.parseDate(d + ' ' + hm, TZ, 'yyyy-MM-dd HH:mm'); };
+  if (it.time) {
+    var st = at(it.date, it.time);
+    ev = cal.createEvent(it.title, st, new Date(st.getTime() + 30 * 60000), {description: it.desc || ''});
+    ev.removeAllReminders();
+    if (set.m0730) { var m = Math.round((st - at(it.date, '07:30')) / 60000); if (m > 0) ev.addPopupReminder(m); }
+    if (set.d1) ev.addPopupReminder(Math.round((st - at(addDaysStr(it.date, -1), '17:00')) / 60000));
+    if (!set.m0730 && !set.d1) ev.addPopupReminder(30);
+  } else if (set.m0730) {
+    var s2 = at(it.date, '07:30');
+    ev = cal.createEvent(it.title, s2, new Date(s2.getTime() + 15 * 60000), {description: it.desc || ''});
+    ev.removeAllReminders(); ev.addPopupReminder(0);
+    if (set.d1) ev.addPopupReminder(870);
+  } else {
+    ev = cal.createAllDayEvent(it.title, at(it.date, '12:00'), {description: it.desc || ''});
+    ev.removeAllReminders();
+    if (set.d1) ev.addPopupReminder(420);
+  }
+  if (it.early) { try { ev.addPopupReminder(Math.min(40320, it.early * 1440 + (it.time ? 0 : 0))); } catch (err) {} }
+  return ev;
+}
+
+function syncCalendar() {
+  var ss = SpreadsheetApp.getActive(); var d = ss.getSheetByName(DATA); if (!d) return {count: 0};
+  var rows = readAll(d); var set = notifySettings(rows).cal;
+  var map = readCalMap(ss); var props = PropertiesService.getScriptProperties();
+  var cal = getCal(set.on);
+  var want = set.on ? calItems(rows, set) : [];
+  var seen = {}; var made = 0;
+  want.forEach(function (it) {
+    var h = JSON.stringify([it.title, it.date, it.time, set.m0730, set.d1, it.early || 0]);
+    seen[it.key] = 1;
+    if (map[it.key] && map[it.key].h === h) return;
+    if (map[it.key] && cal) { try { var old = cal.getEventById(map[it.key].id); if (old) old.deleteEvent(); } catch (err) {} }
+    if (!cal) return;
+    var ev = makeEvent(cal, it, set); map[it.key] = {id: ev.getId(), h: h}; made++;
+  });
+  Object.keys(map).forEach(function (k) {
+    if (seen[k]) return;
+    if (cal) { try { var e = cal.getEventById(map[k].id); if (e) e.deleteEvent(); } catch (err) {} }
+    delete map[k];
+  });
+  writeCalMap(ss, map);
+  props.setProperty('CAL_DIRTY', '0'); props.setProperty('CAL_DAY', ymd(new Date()));
+  return {count: want.length, changed: made};
+}
+
+function calTick() {
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty('CAL_DIRTY') !== '1' && props.getProperty('CAL_DAY') === ymd(new Date())) return;
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return;
+  try { syncCalendar(); } finally { lock.releaseLock(); }
+}
+
+function rescheduleDigest(set) {
+  var props = PropertiesService.getScriptProperties();
+  var hour = Number(String(set.mail.time || '07:00').split(':')[0]) || 7;
+  var want = set.mail.on ? String(hour) : 'off';
+  var has = ScriptApp.getProjectTriggers().filter(function (t) { return t.getHandlerFunction() === 'digestTick'; });
+  if (props.getProperty('MAIL_HOUR') === want && (want === 'off' ? !has.length : has.length === 1)) return;
+  has.forEach(function (t) { ScriptApp.deleteTrigger(t); });
+  if (set.mail.on) ScriptApp.newTrigger('digestTick').timeBased().everyDays(1).atHour(hour).nearMinute(15).inTimezone(TZ).create();
+  props.setProperty('MAIL_HOUR', want);
+}
+
+function digestTick() {
+  var ss = SpreadsheetApp.getActive(); var d = ss.getSheetByName(DATA); if (!d) return;
+  var set = notifySettings(readAll(d)).mail;
+  if (!set.on) return;
+  var dow = Number(Utilities.formatDate(new Date(), TZ, 'u'));
+  if (set.days !== 'all' && dow >= 6) return;
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty('LAST_DIGEST') === ymd(new Date())) return;
+  sendDigest(false);
+}
+
+function sendDigest(test) {
+  var ss = SpreadsheetApp.getActive(); var rows = readAll(ss.getSheetByName(DATA));
+  var set = notifySettings(rows).mail;
+  var T = collectMeta(rows, 'todo:'); var Lf = collectMeta(rows, 'life:'); var B = collectMeta(rows, 'body:');
+  var today = ymd(new Date()); var yest = addDaysStr(today, -1); var ym = today.slice(0, 7);
+  var TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  var DW = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+  var dm = function (s) { var p = s.split('-').map(Number); return p[2] + ' ' + TH[p[1] - 1]; };
+  var esc = function (x) { return String(x == null ? '' : x).replace(/[&<>"]/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]; }); };
+  var fmt = function (n) { return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','); };
+  var jobs = {}; (T.j || []).forEach(function (j) { jobs[j.id] = j; });
+  var open = (T.t || []).filter(function (t) { return !t.done; });
+  var over = open.filter(function (t) { return t.due && t.due < today; });
+  var due = open.filter(function (t) { return t.due === today; });
+  var sections = [];
+  var row = function (l, s, r, c) { return '<tr><td style="padding:8px 0;border-bottom:1px solid #eee"><div style="font-size:14px;color:#111">' + esc(l) + '</div>' + (s ? '<div style="font-size:12px;color:#777">' + esc(s) + '</div>' : '') + '</td><td style="padding:8px 0 8px 12px;border-bottom:1px solid #eee;text-align:right;white-space:nowrap;font-size:12px;font-weight:600;color:' + (c || '#555') + '">' + esc(r || '') + '</td></tr>'; };
+  var sec = function (h, c, body) { sections.push('<div style="margin:18px 0 4px;font-size:12px;font-weight:700;letter-spacing:.04em;color:' + c + '">' + h + '</div><table style="width:100%;border-collapse:collapse">' + body + '</table>'); };
+  var area = {mea: 'MEA', study: 'เรียน', me: 'ส่วนตัว'};
+  if (set.today) {
+    if (over.length) sec('เลยกำหนด', '#D0453A', over.sort(function (a, b) { return a.due.localeCompare(b.due); }).map(function (t) { var j = t.job && jobs[t.job]; return row(t.title, (area[t.area] || '') + (j ? ' · ' + j.name : ''), 'เลย ' + daysBetween(t.due, today) + ' วัน', '#D0453A'); }).join(''));
+    if (due.length) sec('วันนี้', '#111', due.sort(function (a, b) { return (b.imp ? 1 : 0) - (a.imp ? 1 : 0) || String(a.time || '99').localeCompare(String(b.time || '99')); }).map(function (t) { var j = t.job && jobs[t.job]; return row(t.title, (area[t.area] || '') + (j ? ' · ' + j.name : '') + (t.imp ? ' · สำคัญ' : ''), t.time || 'วันนี้'); }).join(''));
+  }
+  if (set.follow) {
+    var fl = (T.j || []).filter(function (j) { return !j.closed && j.wait && j.follow && j.follow <= addDaysStr(today, 1); });
+    if (fl.length) sec('ตามเอกสาร', '#2F6FD0', fl.map(function (j) { return row('รอ' + (j.holder || '') + ' · ' + j.name, '', j.follow <= today ? 'ตามวันนี้' : 'พรุ่งนี้', '#2F6FD0'); }).join(''));
+  }
+  if (set.contract) {
+    var cr = [];
+    (T.j || []).forEach(function (j) {
+      if (j.closed) return;
+      (j.pays || []).forEach(function (p, i) { if (!p.dl && p.due && daysBetween(today, p.due) <= 14) cr.push([p.due, row((p.n || 'งวด ' + (i + 1)) + ' · ' + j.name, 'ยังไม่ส่งมอบ', daysBetween(today, p.due) < 0 ? 'เลย ' + (-daysBetween(today, p.due)) + ' วัน' : 'อีก ' + daysBetween(today, p.due) + ' วัน', '#E2701A')]); });
+      if (j.ct && j.ct.end && daysBetween(today, j.ct.end) <= 30 && daysBetween(today, j.ct.end) >= -30) cr.push([j.ct.end, row('ครบสัญญา · ' + j.name, dm(j.ct.end), daysBetween(today, j.ct.end) >= 0 ? 'อีก ' + daysBetween(today, j.ct.end) + ' วัน' : 'เลยแล้ว', '#E2701A')]);
+      var we = warrantyEndStr(j); if (we && daysBetween(today, we) <= 30 && daysBetween(today, we) >= 0) cr.push([we, row('ครบประกันผลงาน · ' + j.name, dm(we), 'อีก ' + daysBetween(today, we) + ' วัน', '#E2701A')]);
+    });
+    (Lf.r || []).forEach(function (r) { var w = Math.max.apply(null, (r.warn && r.warn.length ? r.warn : [30])); if (r.exp && daysBetween(today, r.exp) <= w) cr.push([r.exp, row('หมดอายุ · ' + r.t, dm(r.exp), daysBetween(today, r.exp) >= 0 ? 'อีก ' + daysBetween(today, r.exp) + ' วัน' : 'หมดแล้ว', '#5E8F12')]); });
+    if (cr.length) sec('สัญญา / งวดงาน / ต่ออายุ', '#E2701A', cr.sort(function (a, b) { return a[0].localeCompare(b[0]); }).map(function (x) { return x[1]; }).join(''));
+  }
+  if (set.money) {
+    var ex = []; rows.forEach(function (r) { if (r[0] === 'expenses' && !r[3]) { try { ex.push(JSON.parse(r[4])); } catch (err) {} } });
+    var mine = ex.filter(function (e) { return !e.reimb; });
+    var y = mine.filter(function (e) { return e.date === yest; }); var m = mine.filter(function (e) { return String(e.date || '').slice(0, 7) === ym; });
+    var reimb = ex.filter(function (e) { return e.reimb && !e.reimbDone; }).reduce(function (s, e) { return s + (Number(e.amount) || 0); }, 0);
+    sec('เงิน', '#A57F3E', row('เมื่อวานใช้ ฿' + fmt(y.reduce(function (s, e) { return s + (Number(e.amount) || 0); }, 0)) + ' · ' + y.length + ' รายการ', 'เดือนนี้ ฿' + fmt(m.reduce(function (s, e) { return s + (Number(e.amount) || 0); }, 0)) + (reimb ? ' · สำรองจ่ายรอเบิก ฿' + fmt(reimb) : ''), ''));
+  }
+  if (set.kcal) {
+    var k = (B.f || []).filter(function (f) { return f.d === yest; }).reduce(function (s, f) { return s + (Number(f.kcal) || 0); }, 0);
+    sec('แคลอรี่', '#178F7E', row('เมื่อวานกิน ' + fmt(k) + ' kcal', '', ''));
+  }
+  var p = today.split('-').map(Number); var dow = Number(Utilities.formatDate(new Date(), TZ, 'u')) % 7;
+  var subject = 'iN&Ex · เช้านี้ ' + DW[dow] + ' ' + p[2] + ' ' + TH[p[1] - 1] + ' — ค้าง ' + (over.length + due.length) + (over.length ? ' · เลยกำหนด ' + over.length : '') + (test ? ' (ทดสอบ)' : '');
+  var html = '<div style="font-family:-apple-system,Segoe UI,Tahoma,sans-serif;max-width:560px;margin:0 auto;padding:8px 4px;color:#111">' +
+    '<div style="font-size:20px;font-weight:700">iN&amp;Ex · สรุปเช้า</div><div style="font-size:13px;color:#777">' + DW[dow] + ' ' + p[2] + ' ' + TH[p[1] - 1] + ' ' + (p[0] + 543) + '</div>' +
+    (sections.length ? sections.join('') : '<p style="margin-top:18px;font-size:14px;color:#555">วันนี้ว่าง ไม่มีงานค้างหรือเรื่องที่ต้องตาม</p>') +
+    '<p style="margin-top:22px;font-size:11px;color:#999">ส่งจาก Apps Script ใน Google Sheet iN&amp;Ex ของคุณ · ปิดหรือเลือกหัวข้อได้ที่ แอป → ตั้งค่า → แจ้งเตือน</p></div>';
+  var to = Session.getEffectiveUser().getEmail();
+  MailApp.sendEmail({to: to, subject: subject, htmlBody: html, name: 'iN&Ex'});
+  if (!test) PropertiesService.getScriptProperties().setProperty('LAST_DIGEST', today);
+  return {to: to, subject: subject};
 }

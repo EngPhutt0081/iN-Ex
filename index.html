@@ -514,7 +514,8 @@ td.open{color:var(--gold);cursor:pointer}
 .b-src a{color:var(--muted)}
 .b-over{color:var(--loss)!important}
 </style>
-<link rel="stylesheet" href="todo.css?v=1">
+<link rel="stylesheet" href="todo.css?v=2">
+<link rel="stylesheet" href="life.css?v=1">
 </head>
 <body>
 
@@ -956,7 +957,7 @@ async function pull(){
  const pend=new Set(outbox.map(o=>o.c+'|'+o.id));const dirty=new Set();let changed=false;
  for(const r of (j.docs||[])){
   const k=r.c+'|'+r.id;if(pend.has(k))continue;
-  if(r.c==='meta'){if(r.id==='settings'&&!r.deleted&&r.doc){settings=r.doc;if(!settings.customSubs)settings.customSubs={};kvSet('settings',settings);changed=true;}else if(String(r.id).startsWith('body:')&&window.BODY){window.BODY.applyRemote(r);}else if(String(r.id).startsWith('todo:')&&window.TODO){window.TODO.applyRemote(r);}continue;}
+  if(r.c==='meta'){if(r.id==='settings'&&!r.deleted&&r.doc){settings=r.doc;if(!settings.customSubs)settings.customSubs={};kvSet('settings',settings);changed=true;}else if(String(r.id).startsWith('body:')&&window.BODY){window.BODY.applyRemote(r);}else if(String(r.id).startsWith('todo:')&&window.TODO){window.TODO.applyRemote(r);}else if(String(r.id).startsWith('life:')&&window.LIFE){window.LIFE.applyRemote(r);}continue;}
   if(!data[r.c])continue;
   const i=data[r.c].findIndex(x=>x.id===r.id);
   if(r.deleted){if(i>=0){data[r.c].splice(i,1);dirty.add(r.c);}}
@@ -1012,6 +1013,7 @@ async function connectSync(btn){
   if(settings&&Object.keys(settings).length)enqueue('meta','settings','put',settings);
   if(window.BODY)window.BODY.enqueueAll();
   if(window.TODO)window.TODO.enqueueAll();
+  if(window.LIFE)window.LIFE.enqueueAll();
   AUTO_DRIVE=true;syncEditing=false;saveSync();$('#notice').hidden=true;toast('เชื่อมต่อแล้ว กำลังซิงก์');
   await flush();renderAll();
  }catch(e){Object.assign(sync,prev);saveSync();toast('เชื่อมต่อไม่ได้: '+((e&&e.message)||e));btn.disabled=false;btn.textContent='เชื่อมต่อ';}
@@ -1440,6 +1442,7 @@ function renderAll(){
  if(curAsset&&!$('#asheet').hidden&&!$('#asheet').contains(document.activeElement))renderAssetSheet();
  if(acform&&acform.id&&!$('#acsheet').hidden&&!(typing&&$('#acsheet').contains(ae)))renderAcctSheet();
  if(form)renderFAcct();
+ if(window.LIFE)window.LIFE.refresh();
 }
 
 /* ---------- expense form ---------- */
@@ -2360,7 +2363,7 @@ function backupHTML(){
 async function doBackup(btn){
  const dl=DL;
  if(!dl){toast('ส่งออกไฟล์ไม่ได้ในหน้าจอนี้');return;}
- const payload={app:'samutjai',version:1,exportedAt:new Date().toISOString(),settings,data:{}};COLLS.forEach(c=>payload.data[c]=data[c]);if(window.BODY)payload.body=window.BODY.exportData();if(window.TODO)payload.todo=window.TODO.exportData();
+ const payload={app:'samutjai',version:1,exportedAt:new Date().toISOString(),settings,data:{}};COLLS.forEach(c=>payload.data[c]=data[c]);if(window.BODY)payload.body=window.BODY.exportData();if(window.TODO)payload.todo=window.TODO.exportData();if(window.LIFE)payload.life=window.LIFE.exportData();
  btn.disabled=true;
  try{await dl.save({filename:'ledger-backup-'+todayISO()+'.json',data:JSON.stringify(payload)});
   try{await store.saveSettings(Object.assign({},settings,{lastBackup:todayISO()}));}catch(e){}
@@ -2375,6 +2378,7 @@ async function doRestore(btn){
   if(j.settings&&typeof j.settings==='object')await store.saveSettings(Object.assign({},settings,j.settings));
   if(j.body&&window.BODY)done+=await window.BODY.importData(j.body);
   if(j.todo&&window.TODO)done+=await window.TODO.importData(j.todo);
+  if(j.life&&window.LIFE)done+=await window.LIFE.importData(j.life);
   pendingRestore=null;toast('กู้คืนครบ '+done+' รายการ');renderAll();
  }catch(e){toast('กู้คืนได้ '+done+' รายการแล้วหยุด: '+errText(e));btn.disabled=false;}
 }
@@ -2526,7 +2530,7 @@ renderAll();
 initStore().then(()=>{
  const d=lsGet(DRAFT_KEY);
  if(d&&!d.id&&(d.amount||d.note||d.from||d.tTrainArr||d.tDepart)){openSheet(Object.assign(blankForm(''),d),d.cat==='transport'?'บันทึกการเดินทาง':'ค่าใช้จ่ายใหม่');toast('เปิดรายการที่ยังไม่ได้บันทึกต่อ');}
- else if(!handleHash()&&autoQuickOn()&&!(window.BODY&&window.BODY.active())&&!(window.TODO&&window.TODO.active()))openQuick();
+ else if(!handleHash()&&autoQuickOn()&&!window.LIFE&&!(window.BODY&&window.BODY.active())&&!(window.TODO&&window.TODO.active()))openQuick();
 });
 /* ---------- bridge for the Body (calorie) mode: read-only helpers + the same store.add path the expense form uses ---------- */
 window.INEX={
@@ -2536,12 +2540,25 @@ window.INEX={
  defaultFoodAcct:()=>defaultExpAcct('food'),
  foodSubs:()=>subsFor('food'),
  expenseById:id=>{const e=data.expenses.find(x=>x.id===id);return e?{id:e.id,amount:e.amount,note:e.note,date:e.date}:null;},
- addExpense:async d=>{const x={date:d.date,time:d.time||'',amount:d.amount,note:String(d.note||'').trim(),cat:'food',createdAt:Date.now(),updatedAt:Date.now()};if(d.sub)x.sub=d.sub;if(d.acct&&acctById(d.acct))x.acct=d.acct;return store.add('expenses',x);}
+ addExpense:async d=>{const x={date:d.date,time:d.time||'',amount:d.amount,note:String(d.note||'').trim(),cat:'food',createdAt:Date.now(),updatedAt:Date.now()};if(d.sub)x.sub=d.sub;if(d.acct&&acctById(d.acct))x.acct=d.acct;return store.add('expenses',x);},
+ /* read-only snapshot + a few safe entry points for the home screen (life.js) */
+ isLoaded:()=>loaded,
+ snapshot:()=>JSON.parse(JSON.stringify({expenses:data.expenses,incomes:data.incomes,trades:data.trades,assets:data.assets,accounts:data.accounts})),
+ bills:K=>{try{return billItems(K).map(i=>i.kind==='card'?{date:i.date,name:'บัตร '+((i.a&&i.a.name)||''),amt:i.left,done:i.left<=0}:{date:i.date,name:(i.r&&i.r.note)||'รายการประจำ',amt:i.amt,done:!!i.done});}catch(e){return [];}},
+ cats:()=>CATS.map(c=>({id:c.id,name:c.name,color:c.color})),
+ quick:k=>quick(k),
+ openExpense:id=>{const e=data.expenses.find(x=>x.id===id);if(!e)return false;setTab('log');openSheet(Object.assign(blankForm(''),e,{amount:e.amount==null?'':String(e.amount),catManual:true,subManual:true,lineManual:!!e.line}),'แก้ไขรายการ');return true;},
+ showTab:t=>setTab(t),
+ addExpenseAny:async d=>{const x={date:d.date||todayISO(),time:d.time||nowHM(),amount:d.amount,note:String(d.note||'').trim(),cat:CAT[d.cat]?d.cat:'other',createdAt:Date.now(),updatedAt:Date.now()};if(d.sub)x.sub=d.sub;if(d.acct&&acctById(d.acct))x.acct=d.acct;return store.add('expenses',x);},
+ openSync:()=>openMore('data'),
+ api:payload=>api(payload),
+ syncConnected:()=>!!sync.url
 };
 })();
 </script>
 <script src="body-engine.js?v=1"></script>
-<script src="body.js?v=2"></script>
-<script src="todo.js?v=1"></script>
+<script src="body.js?v=3"></script>
+<script src="todo.js?v=2"></script>
+<script src="life.js?v=1"></script>
 </body>
 </html>

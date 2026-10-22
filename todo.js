@@ -29,7 +29,7 @@
   const shortD = (s) => { const d = parseD(s); return TH_DS[d.getDay()] + ' ' + d.getDate() + ' ' + TH_MS[d.getMonth()]; };
   const longD = (s) => { const d = parseD(s); return TH_D[d.getDay()] + ' ' + d.getDate() + ' ' + TH_M[d.getMonth()]; };
 
-  const AREAS = { mea: { name: 'MEA', c: 'var(--lime)' }, study: { name: 'เรียน', c: '#8AB8FF' }, me: { name: 'ส่วนตัว', c: '#E2C17A' } };
+  const AREAS = { mea: { name: 'MEA', c: 'var(--mea)' }, study: { name: 'เรียน', c: '#8AB8FF' }, me: { name: 'ส่วนตัว', c: '#E2C17A' } };
   const AREA_KEYS = ['mea', 'study', 'me'];
   const REP = { '': 'ไม่ทำซ้ำ', d: 'ทุกวัน', w: 'ทุกสัปดาห์', m: 'ทุกเดือน' };
   const DEFAULT_STEPS = ['ใบสั่งงาน', 'ประมาณราคา / ราคากลาง', 'ขออนุมัติ PR', 'แบบรูป / ขอบเขตงาน / TOR', 'จัดหาผู้รับจ้าง / ทำสัญญา', 'ควบคุมงาน + บันทึกความคืบหน้า', 'ปิดงาน / ส่งมอบ'];
@@ -53,11 +53,14 @@
   let ready = false;
   const pending = [];
   let mode = 'money', tab = 'today', filter = 'all', weekSel = 0;
-  let tf = null, jf = null, sf = null, setf = null, openJobId = null;
+  let tf = null, jf = null, sf = null, setf = null, openJobId = null, jtab = 'pay', statsYr = 'year';
   let armed = '', armT = null;
 
   const S = () => Object.assign({ urgentDays: 2, steps: DEFAULT_STEPS.slice() }, T.settings || {});
-  const save = () => X.kvSet('todo', T);
+  const listeners = [];
+  let notifyT = null;
+  const notify = () => { clearTimeout(notifyT); notifyT = setTimeout(() => listeners.forEach((fn) => { try { fn(); } catch (e) { /* */ } }), 30); };
+  const save = () => { notify(); return X.kvSet('todo', T); };
   const nid = (k) => k + ':' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const clone = (o) => JSON.parse(JSON.stringify(o));
   function pushItem(item) { const doc = Object.assign({}, item, { _t: Date.now() }); delete doc.id; X.enqueue('meta', 'todo:' + item.id, 'put', doc); }
@@ -136,6 +139,9 @@
   }
 
   /* ---------- small html helpers ---------- */
+  const atag = (area) => '<span class="td-atag" style="--c:' + (AREAS[area] || AREAS.me).c + '">' + areaName(area) + '</span>';
+  const fmtN = (n) => (Number(n) || 0).toLocaleString('th-TH');
+  const dmyY = (s) => { const d = parseD(s); return d.getDate() + ' ' + TH_MS[d.getMonth()] + ' ' + String((d.getFullYear() + 543) % 100).padStart(2, '0'); };
   const dot = (area) => '<i class="td-dot" style="--c:' + (AREAS[area] || AREAS.me).c + '"></i>';
   const areaName = (a) => (AREAS[a] || AREAS.me).name;
   function taskRow(t, opts) {
@@ -146,12 +152,12 @@
     return '<div class="td-row' + (t.done ? ' done' : '') + '">' +
       '<button class="td-chk' + (d.cls === 'over' && !t.done ? ' over' : '') + '" type="button" data-ta="done" data-tv="' + t.id + '" aria-label="' + (t.done ? 'ยกเลิกเสร็จ: ' : 'ทำเสร็จ: ') + esc(t.title) + '" aria-pressed="' + !!t.done + '"><span>' + (t.done ? ICON.check : '') + '</span></button>' +
       '<div class="td-main"><button class="td-body" type="button" data-ta="edit" data-tv="' + t.id + '"><b>' + esc(t.title) + '</b>' + step +
-      '<span class="td-meta">' + dot(t.area) + areaName(t.area) + (t.done ? '<em>เสร็จ ' + (t.doneAt ? dmy(t.doneAt) : '') + '</em>' : '<em class="' + d.cls + '">' + d.text + '</em>') + subs + rep + '</span></button>' +
+      '<span class="td-meta">' + atag(t.area) + (t.done ? '<em>เสร็จ ' + (t.doneAt ? dmy(t.doneAt) : '') + '</em>' : '<em class="' + d.cls + '">' + d.text + '</em>') + subs + rep + '</span></button>' +
       (j && !o.noStep ? '<button class="td-link" type="button" data-ta="job" data-tv="' + j.id + '">ดูขั้นตอน ›</button>' : '') + '</div>' +
       (t.imp && !t.done ? ICON.flag : '') + '</div>';
   }
   const section = (title, note, inner) => '<section class="td-sec"><div class="td-sec-h"><h2>' + title + '</h2><span>' + (note || '') + '</span></div>' + inner + '</section>';
-  const followRow = (j) => '<button class="td-follow" type="button" data-ta="job" data-tv="' + j.id + '"><span><b>ตาม' + esc(j.holder) + '</b><small>' + esc(j.name) + ' · ' + esc(stepName(j, j.cur)) + '</small></span><em class="' + (j.follow < today() ? 'over' : 'today') + '">' + (j.follow < today() ? 'ควรตามตั้งแต่ ' + dmy(j.follow) : 'ตามวันนี้') + '</em></button>';
+  const followRow = (j) => '<button class="td-follow mea" type="button" data-ta="job" data-tv="' + j.id + '"><span><b>ตาม' + esc(j.holder) + '</b><small>' + esc(j.name) + ' · ' + esc(stepName(j, j.cur)) + '</small></span><em class="' + (j.follow < today() ? 'over' : 'today') + '">' + (j.follow < today() ? 'ควรตามตั้งแต่ ' + dmy(j.follow) : 'ตามวันนี้') + '</em></button>';
 
   /* ---------- views ---------- */
   function renderToday(el) {
@@ -244,9 +250,117 @@
     const waiting = open.filter((j) => j.wait).length;
     el.innerHTML = '<div class="td-head"><div class="td-sub">ขั้นตอนเดินเอกสาร</div><h1>งาน MEA</h1></div>' +
       '<div class="td-stats"><div><b>' + open.length + '</b><span>เปิดอยู่</span></div><div><b>' + waiting + '</b><span>รอคนอื่น</span></div><div><b>' + closed.filter((j) => j.closed.slice(0, 4) === yr).length + '</b><span>ปิดแล้วปีนี้</span></div></div>' +
-      '<div class="td-actions"><button class="btn primary b-save" type="button" data-ta="newjob">+ งานใหม่ (ใบสั่งงาน)</button><button class="btn" type="button" data-ta="settings">ตั้งค่า</button></div>' +
+      '<div class="td-actions td-actions3"><button class="btn primary" type="button" data-ta="newjob">+ งานใหม่</button><button class="btn" type="button" data-ta="stats">สถิติ</button><button class="btn" type="button" data-ta="settings">ตั้งค่า</button></div>' +
       (open.length ? open.map(jobCard).join('') : '<div class="td-empty">ยังไม่มีงาน MEA · เพิ่มงานแรกด้วยปุ่มด้านบน แล้วไล่ขั้นตอนเอกสารได้ทีละขั้น</div>') +
       (closed.length ? '<details class="td-more"><summary>ปิดแล้ว (' + closed.length + ')</summary>' + closed.map(jobCard).join('') + '</details>' : '');
+  }
+
+  /* ---------- contract (สัญญา งวดงาน หลักประกัน) ---------- */
+  const PAY_ST = [['dl', 'ส่งมอบ'], ['ac', 'ตรวจรับ'], ['pd', 'เบิกจ่าย']];
+  const safeUrl = (u) => (/^https?:\/\//i.test(String(u || '').trim()) ? String(u).trim() : '');
+  const paysOf = (j) => (Array.isArray(j.pays) ? j.pays : []);
+  const progressOf = (j) => Math.min(100, paysOf(j).filter((p) => p.ac).reduce((s2, p) => s2 + (Number(p.pct) || 0), 0));
+  function warrantyEnd(j) {
+    const c = j.ct || {}; const wy = Number(c.wy) || 0; if (!wy) return null;
+    const ps = paysOf(j); const last = ps.length ? ps[ps.length - 1] : null;
+    const start = last && last.dl ? last.dl : '';
+    return start ? addMonths(start, 12 * wy) : null;
+  }
+  function hasContract(j) { const c = j.ct || {}; return !!(c.end || c.no || c.contractor || paysOf(j).length); }
+  function contractHTML(j) {
+    const c = j.ct || {}; const ps = paysOf(j); const td = today();
+    if (!hasContract(j)) return j.closed ? '' : '<button class="btn" type="button" data-ta="editjob">+ ใส่ข้อมูลสัญญา / งวดงาน (เมื่อถึงขั้นทำสัญญา)</button>';
+    let big = '';
+    if (c.start && c.end) {
+      const total = Math.max(1, diff(c.start, c.end)); const left = diff(td, c.end);
+      const el = Math.min(100, Math.max(0, Math.round(diff(c.start, td) / total * 100)));
+      const prog = progressOf(j); const behind = el - prog;
+      big = '<div class="td-ct-big"><span><small>' + (left >= 0 ? 'เหลือเวลาตามสัญญา' : 'เลยวันสิ้นสุดสัญญา') + '</small><b>' + Math.abs(left) + ' <i>วัน</i></b></span>' +
+        (j.closed ? '' : behind > 5 ? '<span class="td-warn">งานช้ากว่าเวลา ' + behind + '%</span>' : '<span class="td-ok">ตามแผน</span>') + '</div>' +
+        '<div class="td-two"><div><span>เวลาผ่านไป</span><i><s style="width:' + el + '%"></s></i><b>' + el + '%</b></div><div><span>งานคืบหน้า</span><i><s class="m" style="width:' + prog + '%"></s></i><b>' + prog + '%</b></div></div>';
+    }
+    const kv = [['ผู้รับจ้าง', c.contractor], ['เลขที่สัญญา', c.no], ['มูลค่าสัญญา', c.value ? '฿' + fmtN(c.value) : ''], ['ค่าปรับต่อวัน', c.penalty ? '฿' + fmtN(c.penalty) : '']].filter((x) => x[1]);
+    const tabs = '<div class="td-tabs2" role="tablist" aria-label="รายละเอียดสัญญา"><button type="button" role="tab" data-ta="jtab" data-tv="pay" aria-selected="' + (jtab === 'pay') + '">งวดงาน / งวดเงิน</button><button type="button" role="tab" data-ta="jtab" data-tv="bond" aria-selected="' + (jtab === 'bond') + '">หลักประกัน</button></div>';
+    let body;
+    if (jtab === 'bond') {
+      const we = warrantyEnd(j); const wy = Number(c.wy) || 0;
+      const row = (t, sub, right, cls) => '<div class="td-bond"><span><b>' + t + '</b><small>' + sub + '</small></span><b class="' + (cls || '') + '">' + right + '</b></div>';
+      const left = (d) => { const n = diff(td, d); return n >= 0 ? 'อีก ' + n + ' วัน' : 'ครบแล้ว'; };
+      body = '<div class="panel" style="padding:4px 14px">' +
+        (c.end ? row('ครบสัญญา', dmyY(c.end), left(c.end), diff(td, c.end) <= 30 ? 'over' : '') : '') +
+        row('ประกันความชำรุดบกพร่อง', wy ? wy + ' ปี นับจากส่งมอบงวดสุดท้าย' + (we ? ' · ครบ ' + dmyY(we) : '') : 'ยังไม่ได้ใส่จำนวนปี', we ? left(we) : 'เริ่มนับหลังส่งมอบ') +
+        row('หลักประกันสัญญา', 'คืนเมื่อพ้นระยะประกันความชำรุดบกพร่อง', we ? (diff(td, we) >= 0 ? 'คืนได้ ' + dmyY(we) : 'คืนได้แล้ว') : 'ยังไม่ถึง') +
+        row('เตือนล่วงหน้า', 'ผ่านปฏิทินและอีเมลสรุปเช้า', '30 · 15 · 7 วัน') + '</div>';
+    } else if (!ps.length) body = '<div class="td-empty">ยังไม่มีงวดงาน · เพิ่มได้ที่ “แก้ไข”</div>';
+    else {
+      const nextI = ps.findIndex((p) => !p.pd);
+      body = ps.map((p, i) => {
+        const next = i === nextI && !j.closed; const stage = PAY_ST.findIndex(([k]) => !p[k]);
+        let due = p.due ? 'กำหนด ' + dmy(p.due) : 'ยังไม่ใส่วันกำหนด';
+        if (next && p.due && !p.dl) { const n = diff(td, p.due); due += n >= 0 ? ' · อีก ' + n + ' วัน' : ' · เลย ' + (-n) + ' วัน'; }
+        return '<div class="td-pay' + (next ? ' next' : '') + '"><div class="td-pay-h"><b>' + esc(p.n || 'งวด ' + (i + 1)) + (p.pct ? ' · ' + p.pct + '%' : '') + '</b><span class="' + (next && p.due && !p.dl && p.due < td ? 'over' : '') + '">' + due + '</span></div>' +
+          '<div class="td-pst">' + PAY_ST.map(([k, name], si) => '<button type="button" data-ta="pay" data-tv="' + i + ':' + k + '" aria-pressed="' + !!p[k] + '"' + (next && si === stage ? ' class="wait"' : '') + '>' + name + (p[k] ? ' ' + dmy(p[k]) : '') + '</button>').join('') + '</div></div>';
+      }).join('');
+    }
+    return '<section class="td-ct"><div class="td-ct-h"><b>สัญญา</b><span>' + (c.start && c.end ? dmyY(c.start) + ' – ' + dmyY(c.end) : '') + '</span></div>' + big +
+      (kv.length ? '<div class="td-kv4">' + kv.map((x) => '<div><span>' + x[0] + '</span><b>' + esc(x[1]) + '</b></div>').join('') + '</div>' : '') + '</section>' + tabs + body;
+  }
+  function togglePay(v) {
+    const j = jobById(openJobId); if (!j) return;
+    const [i, k] = String(v).split(':'); const p = paysOf(j)[Number(i)]; if (!p) return;
+    const name = (PAY_ST.find((x) => x[0] === k) || [])[1] || '';
+    p[k] = p[k] ? '' : today(); upsert(j);
+    if (p[k]) log(j, 'pay', { what: (p.n || 'งวด ' + (Number(i) + 1)) + ' · ' + name + 'แล้ว' });
+    renderJobDetail(); render();
+  }
+
+  /* ---------- stats ---------- */
+  function statsData() {
+    const Y = today().slice(0, 4); const inY = (d) => statsYr === 'all' || String(d || '').slice(0, 4) === Y;
+    const cISO = (j) => (j.created ? iso(new Date(j.created)) : '');
+    const closed = T.jobs.filter((j) => j.closed && inY(j.closed));
+    const open = T.jobs.filter((j) => !j.closed);
+    const durs = closed.map((j) => (cISO(j) ? diff(cISO(j), j.closed) : null)).filter((x) => x != null);
+    let onT = 0, onN = 0; const byStep = {}; const order = [];
+    T.jobs.forEach((j) => {
+      let prev = cISO(j);
+      stepsOf(j).forEach((s) => {
+        if (s.done && inY(s.done)) {
+          if (s.due) { onN++; if (s.done <= s.due) onT++; }
+          if (prev) { if (!byStep[s.n]) { byStep[s.n] = []; order.push(s.n); } byStep[s.n].push(Math.max(0, diff(prev, s.done))); }
+        }
+        prev = s.done || '';
+      });
+    });
+    const holder = {};
+    T.jobs.forEach((j) => {
+      let last = null;
+      T.logs.filter((l) => l.job === j.id).sort((a, b) => (a.d + a.tm).localeCompare(b.d + b.tm)).forEach((l) => {
+        if ((l.kind === 'back' || l.kind === 'send') && last && inY(l.d)) { (holder[last.to] = holder[last.to] || []).push(Math.max(0, diff(last.d, l.d))); }
+        last = l.kind === 'send' ? l : l.kind === 'back' ? null : last;
+      });
+    });
+    const avg = (a) => (a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : null);
+    const steps = order.map((n) => ({ n, d: avg(byStep[n]) }));
+    const hs = Object.keys(holder).map((h) => ({ h, d: avg(holder[h]), n: holder[h].length })).sort((a, b) => b.d - a.d);
+    return { closed, open, avgJob: avg(durs), onTime: onN ? Math.round(onT / onN * 100) : null, steps, hs, waiting: open.filter((j) => j.wait).length, cISO };
+  }
+  function renderStats() {
+    const S2 = statsData(); const Y = Number(today().slice(0, 4)) + 543;
+    const max = Math.max(1, ...S2.steps.map((s2) => s2.d || 0));
+    const slow = S2.steps.slice().sort((a, b) => (b.d || 0) - (a.d || 0))[0];
+    const tile = (k, v, sub, cls) => '<div><span>' + k + '</span><b class="' + (cls || '') + '">' + v + '</b><small>' + sub + '</small></div>';
+    $('#tdStats .sheet-body').innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="td-sub">นับจากงานที่บันทึกในแอป</span><div class="td-yr" role="group" aria-label="ช่วงเวลา"><button type="button" data-ta="styr" data-tv="year" aria-pressed="' + (statsYr === 'year') + '">ปี ' + Y + '</button><button type="button" data-ta="styr" data-tv="all" aria-pressed="' + (statsYr === 'all') + '">ทั้งหมด</button></div></div>' +
+      '<div class="td-stats td-stats2">' + tile('ปิดงานแล้ว', S2.closed.length, 'จากทั้งหมด ' + T.jobs.length + ' งาน') + tile('เปิดอยู่', S2.open.length, 'รอคนอื่น ' + S2.waiting, 'mea') +
+      tile('เฉลี่ยต่องาน', S2.avgJob == null ? '—' : S2.avgJob + ' วัน', 'ใบสั่งงาน → ปิดงาน') + tile('ทันเป้า', S2.onTime == null ? '—' : S2.onTime + '%', 'ขั้นที่ตั้งเป้าไว้', 'ok') + '</div>' +
+      (S2.steps.length ? '<div class="panel" style="display:flex;flex-direction:column;gap:10px"><div class="td-ct-h"><b>แต่ละขั้นใช้เวลาเฉลี่ย</b><span>วัน</span></div>' +
+        S2.steps.map((s2) => '<div class="td-stbar' + (slow && s2.n === slow.n && S2.steps.length > 1 ? ' slow' : '') + '"><span>' + esc(s2.n) + '</span><i><s style="width:' + Math.round((s2.d || 0) / max * 100) + '%"></s></i><b>' + (s2.d == null ? '—' : s2.d) + '</b></div>').join('') +
+        '<small class="td-hint">' + (slow && S2.steps.length > 1 ? 'ช้าสุด: <b style="color:var(--mea)">' + esc(slow.n) + '</b>' : '') + (S2.hs.length ? ' · เอกสารรอที่ <b>' + esc(S2.hs[0].h) + '</b> นานสุด เฉลี่ย ' + S2.hs[0].d + ' วัน' : '') + '</small></div>'
+        : '<div class="td-empty">ยังไม่มีขั้นที่เสร็จพร้อมวันที่ · กด “ขั้นนี้เสร็จ” ในหน้างาน แล้วสถิติจะขึ้นเอง</div>') +
+      (S2.hs.length ? '<div class="td-sec-h"><h2>เอกสารรอที่ใคร</h2><span>เฉลี่ยวัน</span></div><div class="panel td-log">' + S2.hs.map((h) => '<div class="td-log-r"><span>' + esc(h.h) + '<small>' + h.n + ' ครั้ง</small></span><b class="num">' + h.d + ' วัน</b></div>').join('') + '</div>' : '') +
+      (S2.closed.length ? '<div class="td-sec-h"><h2>ปิดงานล่าสุด</h2><span>ใช้เวลาทั้งงาน</span></div><div class="panel td-log">' + S2.closed.slice().sort((a, b) => b.closed.localeCompare(a.closed)).slice(0, 10).map((j) => '<div class="td-log-r"><span>' + esc(j.name) + '<small>ปิด ' + dmyY(j.closed) + '</small></span><b class="num">' + (S2.cISO(j) ? diff(S2.cISO(j), j.closed) + ' วัน' : '—') + '</b></div>').join('') + '</div>' : '');
+    $('#tdStats').hidden = false;
   }
 
   /* ---------- job detail ---------- */
@@ -285,9 +399,12 @@
         '<div class="td-tl-b"><b>' + esc(s.n) + '</b><small class="' + (late ? 'over' : '') + '">' + date + '</small>' + inner + '</div></div>';
     }).join('');
     const logs = T.logs.filter((l) => l.job === j.id).sort((a, b) => (b.d + b.tm).localeCompare(a.d + a.tm));
-    const logText = (l) => l.kind === 'send' ? 'ส่ง' + esc(stepName(j, l.step) ? ' (' + stepName(j, l.step) + ')' : '') + ' → ' + esc(l.to) : l.kind === 'back' ? 'ได้เอกสารคืนจาก' + esc(l.from || '') : l.kind === 'step' ? 'เสร็จขั้น ' + esc(stepName(j, l.step)) : l.kind === 'open' ? 'เปิดงาน' : l.kind === 'close' ? 'ปิดงาน' : l.kind === 'reopen' ? 'เปิดงานอีกครั้ง' : '';
+    const logText = (l) => l.kind === 'send' ? 'ส่ง' + esc(stepName(j, l.step) ? ' (' + stepName(j, l.step) + ')' : '') + ' → ' + esc(l.to) : l.kind === 'back' ? 'ได้เอกสารคืนจาก' + esc(l.from || '') : l.kind === 'step' ? 'เสร็จขั้น ' + esc(stepName(j, l.step)) : l.kind === 'open' ? 'เปิดงาน' : l.kind === 'close' ? 'ปิดงาน' : l.kind === 'reopen' ? 'เปิดงานอีกครั้ง' : l.kind === 'pay' ? esc(l.what || '') : '';
     $('#tdJob .sheet-body').innerHTML =
-      '<div class="td-jhead"><span>' + dot('mea') + 'งาน MEA' + (j.ref ? ' · ' + esc(j.ref) : '') + '</span>' + (j.desc ? '<p>' + esc(j.desc) + '</p>' : '') + '<button class="ghost" type="button" data-ta="editjob">แก้ไขข้อมูลงาน / ขั้นตอน</button></div>' +
+      '<div class="td-jhead"><span>' + atag('mea') + ' ' + (j.ref ? 'ใบสั่งงาน ' + esc(j.ref) + ' · ' : '') + 'ขั้น ' + Math.min(j.cur + 1, steps.length) + '/' + steps.length + '</span>' + (j.desc ? '<p>' + esc(j.desc) + '</p>' : '') + '</div>' +
+      '<div class="td-jbtns">' + (j.folder ? '<a class="td-folder" href="' + esc(safeUrl(j.folder)) + '" target="_blank" rel="noopener"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>เปิดโฟลเดอร์งาน</a>' : '<button class="td-folder" type="button" data-ta="editjob"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>ใส่ลิงก์โฟลเดอร์ OneDrive</button>') +
+      '<button class="btn" type="button" data-ta="editjob">แก้ไข</button></div>' +
+      contractHTML(j) +
       card +
       '<div class="td-sec-h"><h2>ขั้นตอนเดินเอกสาร</h2><span class="num">' + Math.min(j.cur + 1, steps.length) + ' / ' + steps.length + '</span></div><div class="td-timeline">' + tl + '</div>' +
       '<div class="td-sec-h"><h2>ประวัติเอกสาร</h2><span>' + logs.length + ' รายการ</span></div>' +
@@ -391,12 +508,18 @@
   function readJob() {
     if (!jf) return;
     const v = (s) => { const e = $(s); return e ? e.value : undefined; };
-    ['name', 'ref', 'desc'].forEach((k) => { const x = v('#tj' + k[0].toUpperCase() + k.slice(1)); if (x != null) jf[k] = x; });
+    ['name', 'ref', 'desc', 'folder'].forEach((k) => { const x = v('#tj' + k[0].toUpperCase() + k.slice(1)); if (x != null) jf[k] = x; });
+    jf.ct = jf.ct || {};
+    [['contractor', 'Ctr'], ['no', 'No'], ['value', 'Val'], ['penalty', 'Pen'], ['start', 'Start'], ['end', 'End'], ['wy', 'Wy']].forEach(([k, id]) => { const x = v('#tj' + id); if (x != null) jf.ct[k] = x; });
+    jf.pays = jf.pays || [];
+    jf.pays.forEach((p, i) => { const n = v('#tjPn' + i); const pc = v('#tjPp' + i); const d = v('#tjPd' + i); if (n != null) p.n = n; if (pc != null) p.pct = pc; if (d != null) p.due = d; });
     jf.steps.forEach((s, i) => { const n = v('#tjS' + i); const d = v('#tjD' + i); if (n != null) s.n = n; if (d != null) s.due = d; });
   }
   function renderJobForm() {
     const f = jf;
     const rows = f.steps.map((s, i) => '<div class="td-steprow"><span class="num">' + (i + 1) + '</span><input id="tjS' + i + '" value="' + esc(s.n) + '" aria-label="ชื่อขั้นที่ ' + (i + 1) + '" autocomplete="off"><input type="date" id="tjD' + i + '" value="' + esc(s.due || '') + '" aria-label="เป้าวันที่ขั้นที่ ' + (i + 1) + '"><button type="button" class="td-x" data-ta="jsdel" data-tv="' + i + '" aria-label="ลบขั้นที่ ' + (i + 1) + '"' + (f.steps.length < 2 ? ' disabled' : '') + '>' + ICON.x + '</button></div>').join('');
+    const ct = f.ct || {};
+    const pays = (f.pays || []).map((p, i) => '<div class="td-payrow"><input id="tjPn' + i + '" value="' + esc(p.n || '') + '" aria-label="ชื่องวดที่ ' + (i + 1) + '" autocomplete="off"><input id="tjPp' + i + '" inputmode="decimal" value="' + esc(p.pct || '') + '" aria-label="เปอร์เซ็นต์งวดที่ ' + (i + 1) + '" placeholder="%" autocomplete="off"><input type="date" id="tjPd' + i + '" value="' + esc(p.due || '') + '" aria-label="วันกำหนดงวดที่ ' + (i + 1) + '"><button type="button" class="td-x" data-ta="jpdel" data-tv="' + i + '" aria-label="ลบงวดที่ ' + (i + 1) + '">' + ICON.x + '</button></div>').join('');
     const cur = f.steps.map((s, i) => '<button type="button" class="chip" data-ta="jcur" data-tv="' + i + '" aria-pressed="' + (f.cur === i) + '">' + (i + 1) + ' · ' + esc(s.n || '—') + '</button>').join('');
     $('#tdJobEdit .sheet-body').innerHTML =
       '<label class="field"><span>ชื่องาน</span><input id="tjName" value="' + esc(f.name) + '" placeholder="เช่น บ่อ A + HDD 76 ม." autocomplete="off"></label>' +
@@ -404,6 +527,13 @@
       '<label class="field"><span>รายละเอียด</span><input id="tjDesc" value="' + esc(f.desc) + '" placeholder="เช่น บ่อพักใหม่ · Endcase · HDD 2 ท่อ · Riser" autocomplete="off"></label>' +
       '<div class="field"><span>ขั้นตอนเอกสาร และวันเป้าหมายของแต่ละขั้น</span><div class="panel td-steps">' + rows + '<button type="button" class="td-addck" data-ta="jsadd">' + ICON.plus + 'เพิ่มขั้นตอน</button></div></div>' +
       '<div class="field"><span>ตอนนี้อยู่ขั้นไหน</span><div class="chips">' + cur + '</div></div>' +
+      '<label class="field"><span>ลิงก์โฟลเดอร์งาน (OneDrive)</span><input id="tjFolder" value="' + esc(f.folder || '') + '" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="วางลิงก์จาก OneDrive → แชร์ → คัดลอกลิงก์" autocomplete="off"></label>' +
+      '<div class="td-form-h">สัญญา <small class="td-hint" style="font-weight:400">กรอกเมื่อทำสัญญาแล้ว · เว้นว่างได้</small></div>' +
+      '<div class="row2"><label class="field"><span>ผู้รับจ้าง</span><input id="tjCtr" value="' + esc(ct.contractor || '') + '" autocomplete="off"></label><label class="field"><span>เลขที่สัญญา</span><input id="tjNo" value="' + esc(ct.no || '') + '" autocomplete="off"></label></div>' +
+      '<div class="row2"><label class="field"><span>มูลค่าสัญญา (บาท)</span><input id="tjVal" inputmode="decimal" value="' + esc(ct.value || '') + '" autocomplete="off"></label><label class="field"><span>ค่าปรับต่อวัน (บาท)</span><input id="tjPen" inputmode="decimal" value="' + esc(ct.penalty || '') + '" autocomplete="off"></label></div>' +
+      '<div class="row2"><label class="field"><span>วันเริ่มสัญญา</span><input type="date" id="tjStart" value="' + esc(ct.start || '') + '"></label><label class="field"><span>วันสิ้นสุดสัญญา</span><input type="date" id="tjEnd" value="' + esc(ct.end || '') + '"></label></div>' +
+      '<label class="field"><span>ประกันความชำรุดบกพร่อง (ปี)</span><input id="tjWy" inputmode="numeric" value="' + esc(ct.wy || '') + '" placeholder="เช่น 2" autocomplete="off"></label>' +
+      '<div class="field"><span>งวดงาน (ชื่อ · % ของงาน · วันกำหนดส่งมอบ)</span><div class="panel td-steps">' + pays + '<button type="button" class="td-addck" data-ta="jpadd">' + ICON.plus + 'เพิ่มงวด</button></div></div>' +
       (f.id ? '' : '<small class="td-hint">ขั้นตอนตั้งต้นแก้ได้ที่ “ตั้งค่า” ในแท็บงาน MEA</small>');
   }
   function saveJob() {
@@ -412,7 +542,11 @@
     f.steps = f.steps.map((s) => ({ n: String(s.n || '').trim(), due: s.due || '', done: s.done || '' })).filter((s) => s.n);
     if (!f.steps.length) { X.toast('ต้องมีอย่างน้อย 1 ขั้นตอน'); return; }
     f.cur = Math.min(Math.max(0, Number(f.cur) || 0), f.steps.length - 1);
-    f.ref = String(f.ref || '').trim(); f.desc = String(f.desc || '').trim();
+    f.ref = String(f.ref || '').trim(); f.desc = String(f.desc || '').trim(); f.folder = safeUrl(f.folder);
+    const ct = f.ct || {}; const num = (x) => { const n = Number(String(x || '').replace(/[, ]/g, '')); return isFinite(n) && n > 0 ? n : ''; };
+    f.ct = { contractor: String(ct.contractor || '').trim(), no: String(ct.no || '').trim(), value: num(ct.value), penalty: num(ct.penalty), start: ct.start || '', end: ct.end || '', wy: num(ct.wy) };
+    f.pays = (f.pays || []).map((p, i) => ({ n: String(p.n || '').trim() || 'งวด ' + (i + 1), pct: num(p.pct), due: p.due || '', dl: p.dl || '', ac: p.ac || '', pd: p.pd || '' }));
+    if (f.ct.start && f.ct.end && f.ct.end < f.ct.start) { X.toast('วันสิ้นสุดสัญญาต้องหลังวันเริ่ม'); return; }
     const isNew = !f.id;
     if (isNew) { f.id = nid('j'); f.created = Date.now(); }
     upsert(f); if (isNew) log(f, 'open');
@@ -485,7 +619,7 @@
   }
 
   /* ---------- shell ---------- */
-  function closeSheet(id) { const s = $('#' + id); if (s) s.hidden = true; if (id === 'tdTask') tf = null; if (id === 'tdJobEdit') jf = null; if (id === 'tdSend') sf = null; if (id === 'tdJob') openJobId = null; armed = ''; }
+  function closeSheet(id) { const s = $('#' + id); if (s) s.hidden = true; if (id === 'tdTask') tf = null; if (id === 'tdJobEdit') jf = null; if (id === 'tdSend') sf = null; if (id === 'tdJob') { openJobId = null; jtab = 'pay'; } armed = ''; }
   function render() {
     if (!ready) return;
     if (mode === 'todo') {
@@ -500,12 +634,12 @@
     try { localStorage.setItem('inex-td-tab', t); } catch (e) { /* private mode */ }
     render(); window.scrollTo(0, 0);
   }
-  function enter() {
+  function enter(t) {
     if (window.BODY && window.BODY.setMode) window.BODY.setMode('money');
     mode = 'todo';
     document.body.classList.add('mode-todo');
     $('#todoMain').hidden = false; $('#todoTabs').hidden = false;
-    const b = $('#todoBtn'); b.textContent = '฿'; b.setAttribute('aria-label', 'กลับไปโหมดการเงิน');
+    if (t && ['today', 'week', 'matrix', 'jobs'].includes(t)) { setTab(t); }
     try { localStorage.setItem('inex-mode', 'todo'); } catch (e) { /* private mode */ }
     if (X.closeQuick) X.closeQuick();
     render(); window.scrollTo(0, 0);
@@ -515,27 +649,22 @@
     mode = 'money';
     document.body.classList.remove('mode-todo');
     $('#todoMain').hidden = true; $('#todoTabs').hidden = true;
-    const b = $('#todoBtn'); b.textContent = 'งาน'; b.setAttribute('aria-label', 'สลับไปโหมดงาน (To Do)');
     if (!keepPref) { try { localStorage.setItem('inex-mode', 'money'); } catch (e) { /* private mode */ } }
     window.scrollTo(0, 0);
   }
   function arm(key, rerender) { if (armed === key) return true; armed = key; clearTimeout(armT); armT = setTimeout(() => { if (armed === key) { armed = ''; rerender(); } }, 3500); rerender(); return false; }
 
   function mountUI() {
-    const mb = $('#modeBtn');
-    const tb = document.createElement('button');
-    tb.className = 'mode-btn td-btn'; tb.id = 'todoBtn'; tb.type = 'button'; tb.textContent = 'งาน'; tb.setAttribute('aria-label', 'สลับไปโหมดงาน (To Do)');
-    if (mb && mb.parentNode) mb.parentNode.insertBefore(tb, mb);
     const main = document.createElement('div'); main.id = 'todoMain'; main.hidden = true;
     main.innerHTML = '<section id="tview-today"></section><section id="tview-week" hidden></section><section id="tview-matrix" hidden></section><section id="tview-jobs" hidden></section>';
     const app = $('.app'); if (app) app.appendChild(main);
-    const nav = document.createElement('nav'); nav.className = 'tabs b-tabs t-tabs'; nav.id = 'todoTabs'; nav.hidden = true; nav.setAttribute('aria-label', 'เมนูงาน');
+    const nav = document.createElement('nav'); nav.className = 'tabs b-tabs t-tabs'; nav.id = 'todoTabs'; nav.hidden = true; nav.setAttribute('aria-label', 'เมนู To Do List');
     nav.innerHTML = '<div class="tabs-in"><button class="btab" type="button" data-tdtab="today" aria-selected="true">' + ICON.today + 'วันนี้</button><button class="btab" type="button" data-tdtab="week" aria-selected="false">' + ICON.week + '7 วัน</button>' +
       '<button class="b-add" type="button" data-ta="new" aria-label="เพิ่มงาน">' + ICON.plus + '</button>' +
       '<button class="btab" type="button" data-tdtab="matrix" aria-selected="false">' + ICON.matrix + 'เมทริกซ์</button><button class="btab" type="button" data-tdtab="jobs" aria-selected="false">' + ICON.jobs + 'งาน MEA</button></div>';
     document.body.appendChild(nav);
     // order matters: later sheets stack above earlier ones (task / send / edit open on top of a job)
-    [['tdJob', false], ['tdTask', true], ['tdSend', true], ['tdJobEdit', true], ['tdSet', true]].forEach(([id, withSave]) => {
+    [['tdStats', false], ['tdJob', false], ['tdTask', true], ['tdSend', true], ['tdJobEdit', true], ['tdSet', true]].forEach(([id, withSave]) => {
       const d = document.createElement('div'); d.id = id; d.className = 'sheet td-sheet'; d.hidden = true;
       d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true'); d.setAttribute('aria-labelledby', id + 'T');
       d.innerHTML = '<div class="sheet-head"><button class="ghost" type="button" data-ta="close" data-tv="' + id + '">' + (withSave ? 'ยกเลิก' : 'ปิด') + '</button><h2 id="' + id + 'T"></h2>' +
@@ -547,7 +676,6 @@
   /* ---------- events ---------- */
   document.addEventListener('click', (ev) => {
     const b = ev.target.closest('button'); if (!b) return;
-    if (b.id === 'todoBtn') { if (mode === 'todo') leave(); else enter(); return; }
     const ds = b.dataset;
     if (ds.tdtab) { setTab(ds.tdtab); return; }
     const a = ds.ta; if (!a) return;
@@ -596,6 +724,12 @@
       case 'jsadd': readJob(); jf.steps.push({ n: '', due: '', done: '' }); renderJobForm(); setTimeout(() => { const i = $('#tjS' + (jf.steps.length - 1)); if (i) i.focus(); }, 30); return;
       case 'jsdel': { readJob(); const i = Number(v); if (jf.steps.length < 2) return; jf.steps.splice(i, 1); if (jf.cur >= jf.steps.length) jf.cur = jf.steps.length - 1; else if (jf.cur > i) jf.cur -= 1; renderJobForm(); return; }
       case 'jcur': readJob(); jf.cur = Number(v); renderJobForm(); return;
+      case 'jpadd': readJob(); jf.pays = jf.pays || []; jf.pays.push({ n: 'งวด ' + (jf.pays.length + 1), pct: '', due: '' }); renderJobForm(); return;
+      case 'jpdel': readJob(); jf.pays.splice(Number(v), 1); renderJobForm(); return;
+      case 'jtab': jtab = v === 'bond' ? 'bond' : 'pay'; renderJobDetail(); return;
+      case 'pay': togglePay(v); return;
+      case 'stats': $('#tdStatsT').textContent = 'สถิติงานของฉัน'; renderStats(); return;
+      case 'styr': statsYr = v === 'all' ? 'all' : 'year'; renderStats(); return;
       // send form
       case 'sto': readSend(); sf.to = v; renderSendForm(); return;
       case 'sfol': readSend(); sf.follow = v; renderSendForm(); return;
@@ -614,25 +748,65 @@
     if (ev.key === 'Enter' && ev.target && ev.target.id === 'tdSubNew') { ev.preventDefault(); addSub(); return; }
     if (ev.key === 'Enter' && ev.target && ev.target.id === 'tdTitle') { ev.preventDefault(); saveTask(); return; }
     if (ev.key !== 'Escape') return;
-    for (const id of ['tdSet', 'tdJobEdit', 'tdSend', 'tdTask', 'tdJob']) { const s = $('#' + id); if (s && !s.hidden) { closeSheet(id); if (id !== 'tdJob' && openJobId) renderJobDetail(); return; } }
+    for (const id of ['tdSet', 'tdJobEdit', 'tdSend', 'tdTask', 'tdJob', 'tdStats']) { const s = $('#' + id); if (s && !s.hidden) { closeSheet(id); if (id !== 'tdJob' && openJobId) renderJobDetail(); return; } }
   });
   document.addEventListener('change', (ev) => {
     const t = ev.target;
     if ((t.id === 'tdDue' || t.id === 'tdTime') && tf) { readTask(); renderTaskForm(); }
     if (t.id === 'tsD' && sf) { readSend(); renderSendForm(); }
   });
-  function handleHash() {
-    const h = (location.hash || '').replace('#', '');
-    if (h === 'todo' || h === 'task') { enter(); return true; }
-    if (h === 'todo-add') { enter(); openTask(null); return true; }
-    return false;
+  /* ---------- API for the home screen, search and renewals (life.js) ---------- */
+  function todayItems() {
+    const td = today(); const out = [];
+    T.jobs.filter(followDue).forEach((j) => out.push({ kind: 'follow', id: j.id, title: 'รอ' + j.holder + ' · ' + j.name, sub: 'ตามเอกสาร' + (j.follow < td ? ' (ควรตามตั้งแต่ ' + dmy(j.follow) + ')' : 'วันนี้'), time: 'ตาม', late: j.follow < td, area: 'mea' }));
+    openTasks().filter((t) => t.due && t.due <= td).sort(byPriority).forEach((t) => {
+      const j = t.job && jobById(t.job); const late = t.due < td;
+      out.push({ kind: 'task', id: t.id, title: t.title, sub: areaName(t.area) + (j ? ' · ' + j.name : '') + (late ? ' · เลยกำหนด ' + diff(t.due, td) + ' วัน' : t.imp ? ' · สำคัญ' : ''), time: late ? 'ค้าง' : (t.time || 'วันนี้'), late, area: t.area });
+    });
+    return out;
   }
-  window.addEventListener('hashchange', handleHash);
+  function upcoming(days) {
+    const td = today(); const end = addDays(td, days); const out = [];
+    const inR = (d) => d && d > td && d <= end;
+    T.jobs.filter((j) => !j.closed).forEach((j) => {
+      paysOf(j).forEach((p, i) => { if (!p.dl && inR(p.due)) out.push({ k: 'งวดงาน', t: (p.n || 'งวด ' + (i + 1)) + ' · ' + j.name, date: p.due, area: 'mea', job: j.id }); });
+      const c = j.ct || {}; if (inR(c.end)) out.push({ k: 'ครบสัญญา', t: j.name, date: c.end, area: 'mea', job: j.id });
+      const st = stepsOf(j)[j.cur]; if (st && inR(st.due)) out.push({ k: 'เป้าขั้นงาน', t: st.n + ' · ' + j.name, date: st.due, area: 'mea', job: j.id });
+    });
+    T.jobs.forEach((j) => { const we = warrantyEnd(j); if (inR(we)) out.push({ k: 'ครบประกันผลงาน', t: j.name, date: we, area: 'mea', job: j.id }); });
+    openTasks().filter((t) => t.imp && inR(t.due)).forEach((t) => out.push({ k: 'งานสำคัญ', t: t.title, date: t.due, area: t.area, task: t.id }));
+    return out;
+  }
+  function summary() {
+    const td = today(); const o = openTasks();
+    const due = o.filter((t) => t.due && t.due <= td); const top = o.slice().sort(byPriority)[0];
+    return { due: due.length, overdue: o.filter((t) => t.due && t.due < td).length, next: top ? top.title : '', open: o.length, follow: T.jobs.filter(followDue).length };
+  }
+  function search(q) {
+    const k = String(q || '').trim().toLowerCase(); if (!k) return [];
+    const has = (...xs) => xs.some((x) => String(x || '').toLowerCase().includes(k));
+    const out = [];
+    T.tasks.forEach((t) => { if (has(t.title, t.note, (t.subs || []).map((x) => x.x).join(' '))) { const j = t.job && jobById(t.job); out.push({ g: 'To Do List', t: t.title, s: areaName(t.area) + (j ? ' · ' + j.name : '') + (t.done ? ' · เสร็จแล้ว' : ''), r: t.done ? (t.doneAt ? dmy(t.doneAt) : '') : dueInfo(t).text, late: !t.done && dueInfo(t).cls === 'over', task: t.id, sort: t.done ? 1 : 0 }); } });
+    T.jobs.forEach((j) => { const c = j.ct || {}; if (has(j.name, j.ref, j.desc, c.contractor, c.no)) out.push({ g: 'งาน MEA', t: j.name, s: (j.closed ? 'ปิดแล้ว' : 'ขั้น ' + (j.cur + 1) + ' · ' + stepName(j, j.cur)), r: (Math.min(j.cur + 1, stepsOf(j).length)) + '/' + stepsOf(j).length, job: j.id }); });
+    T.logs.forEach((l) => { const j = jobById(l.job); if (j && has(l.to, l.from, l.text, l.what, l.kind === 'send' ? 'ส่ง ' + stepName(j, l.step) : '')) out.push({ g: 'ประวัติเอกสาร', t: l.kind === 'send' ? 'ส่ง ' + stepName(j, l.step) + ' → ' + l.to : l.kind === 'back' ? 'ได้คืนจาก' + (l.from || '') : (l.what || stepName(j, l.step)), s: j.name, r: dmy(l.d), job: j.id }); });
+    return out.sort((a, b) => (a.sort || 0) - (b.sort || 0));
+  }
+  function createTask(obj) {
+    const t = Object.assign({ title: '', area: 'me', due: '', time: '', imp: false, rep: '', subs: [], note: '', job: '', step: null, done: false }, obj, { id: obj && obj.id ? obj.id : nid('t'), created: Date.now() });
+    upsert(t); render(); return t.id;
+  }
+  function openJob(id) { openJobId = id; armed = ''; renderJobDetail(); const s2 = $('#tdJob'); if (s2) s2.scrollTop = 0; }
 
   window.TODO = {
-    applyRemote, enqueueAll, exportData, importData, leave,
+    applyRemote, enqueueAll, exportData, importData, leave, enter,
     count: () => T.tasks.length + T.jobs.length + T.logs.length,
     active: () => { try { return localStorage.getItem('inex-mode') === 'todo'; } catch (e) { return false; } },
+    isOn: () => mode === 'todo', ready: () => ready,
+    todayItems, upcoming, summary, search, createTask, openJob,
+    openTask: (id, preset) => openTask(id || null, preset),
+    openStats: () => { $('#tdStatsT').textContent = 'สถิติงานของฉัน'; renderStats(); },
+    hasTask: (pred) => T.tasks.some(pred),
+    onChange: (fn) => { listeners.push(fn); },
   };
 
   mountUI();
@@ -640,12 +814,11 @@
   try { const t = localStorage.getItem('inex-td-tab'); if (['today', 'week', 'matrix', 'jobs'].includes(t)) tab = t; } catch (e) { /* */ }
   $$('[data-tdtab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tdtab === tab)));
   ['today', 'week', 'matrix', 'jobs'].forEach((v) => { $('#tview-' + v).hidden = v !== tab; });
-  if (window.TODO.active()) enter();
   X.ready().then(async () => {
     const v = await X.kvGet('todo');
     if (v && typeof v === 'object') T = { tasks: Array.isArray(v.tasks) ? v.tasks : [], jobs: Array.isArray(v.jobs) ? v.jobs : [], logs: Array.isArray(v.logs) ? v.logs : [], settings: v.settings || null };
     ready = true;
     pending.splice(0).forEach(applyRemote);
-    render(); handleHash();
+    render(); notify();
   });
 })();

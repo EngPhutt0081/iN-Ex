@@ -524,10 +524,11 @@
   window.BODY = {
     applyRemote, enqueueAll, exportData, importData, openQuick, setMode,
     active: () => { try { return localStorage.getItem('inex-mode') === 'body'; } catch (e) { return false; } },
+    isOn: () => mode === 'body',
+    summary: () => { if (!ready) return null; const b = calc(X.todayISO()); return { remaining: Math.round(b.remaining), eaten: Math.round(b.eaten), target: Math.round(b.target + b.bonus) }; },
   };
 
-  // show the right mode immediately, then load data once the money store is open
-  if (window.BODY.active()) setMode('body');
+  // which mode shows at start is decided by life.js (home screen); data loads once the money store is open
   X.ready().then(async () => {
     const v = await X.kvGet('body');
     if (v && typeof v === 'object') B = { profile: v.profile || null, w: Array.isArray(v.w) ? v.w : [], f: Array.isArray(v.f) ? v.f : [], x: Array.isArray(v.x) ? v.x : [] };
