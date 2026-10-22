@@ -4,8 +4,8 @@
  * 1) เลือกฟังก์ชัน setup แล้วกด Run (อนุญาตสิทธิ์ครั้งแรก)
  * 2) Deploy > New deployment > Web app > Execute as: Me, Who has access: Anyone > Deploy
  * 3) คัดลอก Web app URL และรหัสลับจากแท็บ "ตั้งค่า" ไปใส่ในแอป
- * 4) (สำรองทุกคืน) เลือกฟังก์ชัน setupBackup แล้วกด Run ครั้งเดียว — Google จะก๊อปทั้ง Sheet
- *    ไปไว้ในโฟลเดอร์ "iN&Ex Backup" บน Drive ทุกคืนหลังเที่ยงคืน เก็บย้อนหลัง 30 วัน
+ * 4) (สำรองทุกคืน) เลือกฟังก์ชัน setupBackup แล้วกด Run ครั้งเดียว — ทุกคืนหลังเที่ยงคืน Google จะอัปเดต
+ *    ไฟล์สำรองของเดือนนั้นในโฟลเดอร์ "iN&Ex Backup" บน Drive (เดือนละ 1 ไฟล์ เช่น "iN&Ex สำรอง 2026-10")
  * v2: แท็บ "งาน" และ "ประวัติเอกสาร" (โหมด To Do) + สำรองไป Drive
  */
 var DATA = '_data';
@@ -13,8 +13,8 @@ var ACC = 'บัญชี';
 var SET = 'ตั้งค่า';
 var TASKS = 'งาน';
 var DOCLOG = 'ประวัติเอกสาร';
-var KEEP_DAYS = 30;
 var BACKUP_PREFIX = 'iN&Ex สำรอง ';
+var BACKUP_LOG = 'บันทึกการสำรอง';
 var COLLS = ['expenses', 'incomes', 'accounts', 'moves', 'assets', 'trades', 'meta'];
 
 var CAT = {food: 'อาหาร/เครื่องดื่ม', transport: 'เดินทาง', housing: 'ที่พัก', bills: 'บิล/ค่าน้ำไฟ', shopping: 'ของใช้/ช้อปปิ้ง',
@@ -93,7 +93,7 @@ function doPost(e) {
     if (body.action === 'ping') return out({ok: true, ver: 2, sheetUrl: ss.getUrl(), lastBackup: lastBackup()});
     if (body.action === 'push') return out(push(ss, sh, body.ops || []));
     if (body.action === 'pull') return out(pull(ss, sh, Number(body.since) || 0));
-    if (body.action === 'backup') { var b = backupNow(); b.ok = true; return out(b); }
+    if (body.action === 'backup') { var b = backupNow(false); b.ok = true; return out(b); }
     return out({ok: false, error: 'unknown action'});
   } finally {
     lock.releaseLock();
@@ -407,7 +407,9 @@ function writeTodo(ss, rows) {
   lg.autoResizeColumns(1, 8);
 }
 
-/* ---------- nightly backup: copy the whole Sheet into Drive folder "iN&Ex Backup", keep 30 days ---------- */
+/* ---------- nightly backup: Drive folder "iN&Ex Backup" → ONE Google Sheet per month ("iN&Ex สำรอง 2026-10"),
+   refreshed every night with that month's tab, account balances, To Do tabs and the full raw data (_data, hidden),
+   plus one row per backup in the tab "บันทึกการสำรอง". Nothing is ever deleted except leftover daily copies from v2.0. */
 function lastBackup() { return PropertiesService.getScriptProperties().getProperty('LAST_BACKUP') || ''; }
 
 function backupFolder() {
@@ -421,36 +423,81 @@ function backupFolder() {
   return folder;
 }
 
-function backupNow() {
+function monthFile(folder, name) {
+  var it = folder.getFilesByName(name);
+  while (it.hasNext()) {
+    var f = it.next();
+    if (!f.isTrashed() && f.getMimeType() === MimeType.GOOGLE_SHEETS) return SpreadsheetApp.openById(f.getId());
+  }
+  var bk = SpreadsheetApp.create(name);
+  DriveApp.getFileById(bk.getId()).moveTo(folder);
+  return bk;
+}
+
+/* nightly = true: runs just after midnight, so it files into YESTERDAY's month (the 1st of a month closes the previous month's file) */
+function backupNow(nightly) {
   var ss = SpreadsheetApp.getActive();
   var folder = backupFolder();
-  var at = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm');
-  var name = BACKUP_PREFIX + at;
-  var copy = DriveApp.getFileById(ss.getId()).makeCopy(name, folder);
-  var cutoff = Date.now() - KEEP_DAYS * 864e5;
+  var now = new Date();
+  var at = Utilities.formatDate(now, 'Asia/Bangkok', 'yyyy-MM-dd HH:mm');
+  var month = Utilities.formatDate(nightly ? new Date(now.getTime() - 12 * 3600e3) : now, 'Asia/Bangkok', 'yyyy-MM');
+  var name = BACKUP_PREFIX + month;
+  var bk = monthFile(folder, name);
+
+  [month, ACC, TASKS, DOCLOG, DATA].forEach(function (n) {
+    var src = ss.getSheetByName(n);
+    if (!src) return;
+    var tmp = bk.getSheetByName(n + ' (เก่า)');
+    if (tmp) bk.deleteSheet(tmp);
+    var old = bk.getSheetByName(n);
+    if (old) old.setName(n + ' (เก่า)');
+    var c = src.copyTo(bk);
+    if (old) bk.deleteSheet(old);
+    c.setName(n);
+    if (n === DATA) c.hideSheet();
+  });
+  var first = bk.getSheetByName(month) || bk.getSheetByName(ACC);
+  if (first) { bk.setActiveSheet(first); bk.moveActiveSheet(1); }
+  ['Sheet1', 'ชีต1', 'แผ่นงาน1'].forEach(function (n) {
+    var x = bk.getSheetByName(n);
+    if (x && bk.getSheets().length > 1 && x.getLastRow() === 0) bk.deleteSheet(x);
+  });
+
+  var rows = readAll(ss.getSheetByName(DATA));
+  var total = 0, inMonth = 0;
+  rows.forEach(function (r) {
+    if (r[3]) return;
+    total++;
+    try { var d = JSON.parse(r[4] || '{}'); if (String(d.date || '').slice(0, 7) === month) inMonth++; } catch (err) {}
+  });
+  var lg = bk.getSheetByName(BACKUP_LOG) || bk.insertSheet(BACKUP_LOG);
+  if (lg.getLastRow() === 0) { lg.appendRow(['เวลาที่สำรอง', 'แบบ', 'รายการทั้งหมดในระบบ', 'รายการลงวันที่เดือนนี้']); lg.getRange(1, 1, 1, 4).setFontWeight('bold'); }
+  lg.appendRow([at, nightly ? 'อัตโนมัติทุกคืน' : 'กดเอง', total, inMonth]);
+
+  // leftovers from v2.0, which made one full copy per day
   var removed = 0;
   var it = folder.getFiles();
   while (it.hasNext()) {
     var f = it.next();
-    if (f.getId() !== copy.getId() && f.getName().indexOf(BACKUP_PREFIX) === 0 && f.getDateCreated().getTime() < cutoff) { f.setTrashed(true); removed++; }
+    if (/^iN&Ex สำรอง \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(f.getName())) { f.setTrashed(true); removed++; }
   }
   PropertiesService.getScriptProperties().setProperty('LAST_BACKUP', at);
-  return {name: name, url: copy.getUrl(), at: at, folderUrl: folder.getUrl(), removed: removed};
+  return {name: name, url: bk.getUrl(), at: at, folderUrl: folder.getUrl(), removed: removed};
 }
 
 function nightlyBackup() {
   var lock = LockService.getScriptLock();
   lock.waitLock(60000);
-  try { backupNow(); } finally { lock.releaseLock(); }
+  try { backupNow(true); } finally { lock.releaseLock(); }
 }
 
-/* Run once from the editor: schedules nightlyBackup every night 00:00–01:00 Bangkok time and makes the first copy now. */
+/* Run once from the editor: schedules nightlyBackup every night 00:00–01:00 Bangkok time and backs up this month now. */
 function setupBackup() {
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'nightlyBackup') ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('nightlyBackup').timeBased().everyDays(1).atHour(0).nearMinute(15).inTimezone('Asia/Bangkok').create();
   var ss = SpreadsheetApp.getActive();
   var d = ss.getSheetByName(DATA);
   if (d) writeTodo(ss, readAll(d));
-  var r = backupNow();
-  Logger.log('ตั้งเวลาสำรองทุกคืนแล้ว · สำรองครั้งแรก: ' + r.name + ' · โฟลเดอร์: ' + r.folderUrl);
+  var r = backupNow(false);
+  Logger.log('ตั้งเวลาสำรองทุกคืนแล้ว · ไฟล์เดือนนี้: ' + r.name + ' · โฟลเดอร์: ' + r.folderUrl);
 }

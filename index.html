@@ -987,7 +987,7 @@ function syncHTML(){
   h+='<p class="insight" style="margin:0">บันทึกอะไรในแอป ข้อมูลจะเข้า Google Sheet ภายในไม่กี่วินาทีเมื่อมีเน็ต ตอนออฟไลน์ก็บันทึกได้ตามปกติ แอปจะส่งตามให้เองเมื่อกลับมาออนไลน์ ใน Sheet มีแท็บบัญชี และแท็บรายเดือน</p>';
   if(sync.sheetUrl)h+='<a class="btn primary wide" href="'+esc(sync.sheetUrl)+'" target="_blank" rel="noopener">เปิด Google Sheet</a>';
   h+='<button class="btn wide" id="syncNow" type="button">ซิงก์ตอนนี้</button>';
-  h+='<button class="btn wide" id="driveBackup" type="button">สำรองไป Google Drive ตอนนี้</button><p class="insight" style="margin:0">'+(sync.lastDrive?'สำรองไป Drive ล่าสุด '+esc(sync.lastDrive)+' · ':'')+'Google สำรองทั้ง Sheet ให้ทุกคืนเอง (เก็บย้อนหลัง 30 วัน) ไม่ต้องเปิดแอป</p>';
+  h+='<button class="btn wide" id="driveBackup" type="button">สำรองไป Google Drive ตอนนี้</button><p class="insight" style="margin:0">'+(sync.lastDrive?'สำรองไป Drive ล่าสุด '+esc(sync.lastDrive)+' · ':'')+'ทุกคืน Google อัปเดตไฟล์สำรองของเดือนนั้นในโฟลเดอร์ iN&amp;Ex Backup ให้เอง (เดือนละ 1 ไฟล์) ไม่ต้องเปิดแอป</p>';
   h+='<button class="ghost" id="syncEdit" type="button">เปลี่ยนการเชื่อมต่อ</button>';
  }else{
   h+='<p class="insight" style="margin:0">ใส่ Web app URL และรหัสลับจาก Google Sheet ที่ตั้งค่าไว้ (ดูวิธีใน README) ระหว่างยังไม่เชื่อม ข้อมูลจะเก็บในเครื่องนี้ก่อน เชื่อมเมื่อไหร่ แอปจะส่งข้อมูลที่บันทึกไว้ขึ้นให้ทั้งหมด</p>'+
