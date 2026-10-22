@@ -1,6 +1,6 @@
 /* iN&Ex service worker: app works offline; online opens always get the latest version */
-const V = 'inex-v6';
-const SHELL = ['./', './index.html', './body-engine.js?v=1', './body.js?v=3', './todo.js?v=2', './todo.css?v=2', './life.js?v=2', './life.css?v=2', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
+const V = 'inex-v7';
+const SHELL = ['./', './index.html', './body-engine.js?v=1', './body.js?v=3', './todo.js?v=2', './todo.css?v=2', './life.js?v=3', './life.css?v=2', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });
@@ -15,6 +15,7 @@ self.addEventListener('fetch', e => {
   if (r.method !== 'GET') return;
   const u = new URL(r.url);
   if (/(^|\.)script\.google\.com$|googleusercontent\.com$/.test(u.hostname)) return;
+  if (u.pathname.endsWith('/version.json')) return;
   if (r.mode === 'navigate') {
     e.respondWith(withTimeout(fetch(r), 3000).then(res => {
       if (res.ok) { const cp = res.clone(); caches.open(V).then(c => c.put('./index.html', cp)); }

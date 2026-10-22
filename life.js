@@ -29,6 +29,7 @@
   const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (e) { return d; } };
   const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } };
 
+  const BUILD = '2026.10.23-2';
   const MODES = {
     money: { name: 'เงิน', sub: 'รายรับ รายจ่าย เดินทาง ลงทุน', c: '#C9A46A', soft: '#2A2419', mark: '฿' },
     todo: { name: 'To Do List', sub: 'งาน MEA · เรียน · ส่วนตัว', c: '#C9F24A', soft: '#1B2110', mark: '✓' },
@@ -102,6 +103,8 @@
       else { if (window.TODO && window.TODO.isOn()) window.TODO.leave(); if (window.BODY && window.BODY.isOn()) window.BODY.setMode('money'); lsSet('inex-mode', 'money'); }
       lsSet('inex-last', m);
       if (m === 'money' && opt && opt.tab) X.showTab(opt.tab);
+      const hints = Number(lsGet('inex-swipe-hint', '0'));
+      if (hints < 2) { lsSet('inex-swipe-hint', String(hints + 1)); setTimeout(() => X.toast('ปัดจากขอบจอซ้ายไปขวา เพื่อกลับหน้าแรก'), 400); }
       window.scrollTo(0, 0);
     }
     updateChip();
@@ -441,7 +444,8 @@
         '<small>ในสรุปมี</small><div class="chips">' + chip('nt-mw', 'today', n.mail.today, 'งานวันนี้ + เลยกำหนด') + chip('nt-mw', 'follow', n.mail.follow, 'เอกสารที่ต้องตาม') + chip('nt-mw', 'contract', n.mail.contract, 'สัญญา/งวด/ต่ออายุ') + chip('nt-mw', 'money', n.mail.money, 'ใช้เงินเมื่อวาน + เดือนนี้') + chip('nt-mw', 'kcal', n.mail.kcal, 'แคลอรี่เมื่อวาน') + '</div>' +
         '<button type="button" class="btn" data-lf="nt-test">ส่งอีเมลทดสอบตอนนี้</button>' : '') + '</div>' +
       '<p class="lf-note">ปฏิทินและอีเมลต้องใช้ Code.gs v3 ใน Google Sheet (ดูวิธีใน README) · ปฏิทินอัปเดตภายในประมาณ 10 นาทีหลังแก้งาน</p>' +
-      '<button type="button" class="btn wide" data-lf="go-sync">ซิงก์ สำรองข้อมูล และกู้คืน ›</button>');
+      '<button type="button" class="btn wide" data-lf="go-sync">ซิงก์ สำรองข้อมูล และกู้คืน ›</button>' +
+      '<p class="lf-note" style="text-align:center">iN&amp;Ex เวอร์ชัน ' + BUILD + ' · ปัดจากขอบจอซ้ายไปขวาเพื่อย้อนกลับ</p>');
   }
   function setNotify(path, val) { const s = S(); const n = clone(s.notify); const [a, b] = path; n[a][b] = val; saveSettings({ notify: n }); openSet(); }
 
@@ -593,7 +597,7 @@
   });
 
   /* ---------- swipe from the left edge = back (close the top sheet, else go to the home screen) ---------- */
-  const EDGE = 28;
+  const EDGE = 44;
   let sw = null;
   const visible = (el) => !el.hidden && getComputedStyle(el).display !== 'none';
   function topSheet() { const list = $$('.sheet').filter(visible); return list.length ? list[list.length - 1] : null; }
@@ -665,6 +669,20 @@
   };
   document.addEventListener('touchend', endSwipe, { passive: true });
   document.addEventListener('touchcancel', () => { if (sw && sw.on) finishDrag(false); sw = null; }, { passive: true });
+
+  /* ---------- new version check: a home-screen app resumed from the background never reloads by itself ---------- */
+  let lastCheck = 0;
+  async function checkUpdate() {
+    if (navigator.onLine === false || Date.now() - lastCheck < 60000) return;
+    lastCheck = Date.now();
+    try {
+      const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) return; const j = await r.json();
+      if (j && j.build && j.build !== BUILD) X.toast('มีเวอร์ชันใหม่ของแอป', { label: 'อัปเดตตอนนี้', fn: () => { location.reload(); } });
+    } catch (e) { /* offline */ }
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(); });
+  setTimeout(checkUpdate, 4000);
 
   window.LIFE = { applyRemote, enqueueAll, exportData, importData, refresh, setMode, mode: curMode, openSearch };
 
