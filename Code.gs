@@ -10,6 +10,28 @@
  * v3: ส่งกำหนดส่งเข้า Google Calendar + อีเมลสรุปเช้า (ตั้งค่าในแอป → ตั้งค่า → แจ้งเตือน)
  *     หลังวางโค้ดใหม่ ให้รันฟังก์ชัน setupAll ครั้งเดียว แล้ว Deploy → Manage deployments → New version
  */
+
+/* Run ONCE from the editor after pasting this code (asks for Drive, Calendar, Gmail and trigger permissions):
+   nightly backup 00:00–01:00, calendar check every 10 minutes, morning email at the hour set in the app. */
+function setupAll() {
+  var keep = ['nightlyBackup', 'calTick', 'digestTick'];
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (keep.indexOf(t.getHandlerFunction()) >= 0) ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('nightlyBackup').timeBased().everyDays(1).atHour(0).nearMinute(15).inTimezone('Asia/Bangkok').create();
+  ScriptApp.newTrigger('calTick').timeBased().everyMinutes(10).create();
+  var ss = SpreadsheetApp.getActive();
+  var d = ss.getSheetByName(DATA);
+  var rows = d ? readAll(d) : [];
+  if (d) writeTodo(ss, rows);
+  var set = notifySettings(rows);
+  rescheduleDigest(set);
+  var r = backupNow(false);
+  var c = syncCalendar();
+  Logger.log('สำรองทุกคืน: ตั้งแล้ว · ไฟล์เดือนนี้ ' + r.name + ' · โฟลเดอร์ ' + r.folderUrl);
+  Logger.log('ปฏิทิน: ' + (set.cal.on ? 'ส่ง ' + c.count + ' รายการเข้าปฏิทิน “' + CAL_NAME + '”' : 'ปิดอยู่ (เปิดได้ในแอป → ตั้งค่า → แจ้งเตือน)'));
+  Logger.log('อีเมลสรุปเช้า: ' + (set.mail.on ? 'ทุก' + (set.mail.days === 'all' ? 'วัน' : 'วันจันทร์–ศุกร์') + ' ประมาณ ' + set.mail.time + ' น. ส่งถึง ' + Session.getEffectiveUser().getEmail() : 'ปิดอยู่'));
+}
+function setupBackup() { setupAll(); }
+
 var DATA = '_data';
 var ACC = 'บัญชี';
 var SET = 'ตั้งค่า';
@@ -503,26 +525,7 @@ function nightlyBackup() {
   try { backupNow(true); } finally { lock.releaseLock(); }
 }
 
-/* Run ONCE from the editor after pasting this code (asks for Drive, Calendar, Gmail and trigger permissions):
-   nightly backup 00:00–01:00, calendar check every 10 minutes, morning email at the hour set in the app. */
-function setupAll() {
-  var keep = ['nightlyBackup', 'calTick', 'digestTick'];
-  ScriptApp.getProjectTriggers().forEach(function (t) { if (keep.indexOf(t.getHandlerFunction()) >= 0) ScriptApp.deleteTrigger(t); });
-  ScriptApp.newTrigger('nightlyBackup').timeBased().everyDays(1).atHour(0).nearMinute(15).inTimezone('Asia/Bangkok').create();
-  ScriptApp.newTrigger('calTick').timeBased().everyMinutes(10).create();
-  var ss = SpreadsheetApp.getActive();
-  var d = ss.getSheetByName(DATA);
-  var rows = d ? readAll(d) : [];
-  if (d) writeTodo(ss, rows);
-  var set = notifySettings(rows);
-  rescheduleDigest(set);
-  var r = backupNow(false);
-  var c = syncCalendar();
-  Logger.log('สำรองทุกคืน: ตั้งแล้ว · ไฟล์เดือนนี้ ' + r.name + ' · โฟลเดอร์ ' + r.folderUrl);
-  Logger.log('ปฏิทิน: ' + (set.cal.on ? 'ส่ง ' + c.count + ' รายการเข้าปฏิทิน “' + CAL_NAME + '”' : 'ปิดอยู่ (เปิดได้ในแอป → ตั้งค่า → แจ้งเตือน)'));
-  Logger.log('อีเมลสรุปเช้า: ' + (set.mail.on ? 'ทุก' + (set.mail.days === 'all' ? 'วัน' : 'วันจันทร์–ศุกร์') + ' ประมาณ ' + set.mail.time + ' น. ส่งถึง ' + Session.getEffectiveUser().getEmail() : 'ปิดอยู่'));
-}
-function setupBackup() { setupAll(); }
+
 
 /* ---------- v3: notifications (Google Calendar + morning email), settings come from the app as meta "life:settings" ---------- */
 var CAL_NAME = 'iN&Ex งาน';
