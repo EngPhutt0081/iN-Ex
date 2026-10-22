@@ -194,3 +194,14 @@ body.mode-home{overflow:hidden}
 .lf-nt{display:flex;flex-direction:column;gap:10px}
 .lf-nt > small{font-size:12px;color:var(--muted)}
 .lf-tax-h{display:flex;justify-content:flex-end}
+
+/* swipe from the left edge = back */
+html.lf-drag-root,body.lf-drag{overflow-x:hidden}
+body.lf-drag .app{position:relative;z-index:16;background:var(--bg);min-height:100vh}
+body.lf-drag nav.tabs{z-index:17}
+body.lf-drag #fab{z-index:18}
+body.lf-drag #lfHome{z-index:1}
+#lfDragShade{position:fixed;inset:0;z-index:15;background:var(--bg);box-shadow:-14px 0 32px rgba(0,0,0,.6);pointer-events:none;display:none}
+body.lf-drag #lfDragShade{display:block}
+body.lf-drag #lfHome::after{content:"";position:absolute;inset:0;background:#000;opacity:var(--lf-dim,0);pointer-events:none;z-index:5}
+.sheet.lf-sdrag{box-shadow:-14px 0 32px rgba(0,0,0,.6)}

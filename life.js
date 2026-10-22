@@ -568,6 +568,8 @@
     const sw = document.createElement('div'); sw.id = 'lfSwitch'; sw.hidden = true; sw.setAttribute('role', 'dialog'); sw.setAttribute('aria-modal', 'true'); sw.setAttribute('aria-label', 'เลือกโหมด');
     sw.innerHTML = '<div class="lf-sheet-in"></div>';
     document.body.appendChild(sw);
+    const shade = document.createElement('div'); shade.id = 'lfDragShade'; shade.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(shade);
     window.addEventListener('resize', () => { if (!home().hidden) measure(); });
     new MutationObserver(updateChip).observe(document.body, { attributes: true, attributeFilter: ['class'] });
   }
@@ -589,6 +591,80 @@
     else if (h === 'todo-add') { setMode('todo'); window.TODO.openTask(null); }
     else if (h === 'kcal' || h === 'body') { document.body.classList.remove('mode-home'); home().hidden = true; updateChip(); }
   });
+
+  /* ---------- swipe from the left edge = back (close the top sheet, else go to the home screen) ---------- */
+  const EDGE = 28;
+  let sw = null;
+  const visible = (el) => !el.hidden && getComputedStyle(el).display !== 'none';
+  function topSheet() { const list = $$('.sheet').filter(visible); return list.length ? list[list.length - 1] : null; }
+  function movers() { return $$('.app, nav.tabs, #fab, #lfDragShade').filter((el) => el.id === 'lfDragShade' || visible(el)); }
+  function beginDrag() {
+    if (sw.sheet) { sw.sheet.style.transition = 'none'; sw.sheet.classList.add('lf-sdrag'); return; }
+    document.documentElement.classList.add('lf-drag-root'); document.body.classList.add('lf-drag');
+    const h = home(); h.hidden = false; renderHome(true);
+    h.style.transition = 'none'; h.style.transform = 'translate3d(-30%,0,0)';
+    sw.els = movers(); sw.els.forEach((el) => { el.style.transition = 'none'; el.style.willChange = 'transform'; });
+  }
+  function dragTo(dx) {
+    const W = window.innerWidth;
+    if (sw.sheet) { sw.sheet.style.transform = 'translate3d(' + dx + 'px,0,0)'; return; }
+    sw.els.forEach((el) => { el.style.transform = 'translate3d(' + dx + 'px,0,0)'; });
+    const k = Math.min(1, dx / W);
+    home().style.transform = 'translate3d(' + (-30 * (1 - k)).toFixed(2) + '%,0,0)';
+    home().style.setProperty('--lf-dim', (0.45 * (1 - k)).toFixed(3));
+  }
+  function finishDrag(commit) {
+    const W = window.innerWidth; const ms = 230; const tr = 'transform ' + ms + 'ms cubic-bezier(.2,.8,.2,1)';
+    const st = sw;
+    if (st.sheet) {
+      const sh = st.sheet; sh.style.transition = tr; sh.style.transform = 'translate3d(' + (commit ? W : 0) + 'px,0,0)';
+      setTimeout(() => {
+        if (commit) { const btn = sh.querySelector('.sheet-head button'); if (btn) btn.click(); }
+        sh.style.transition = 'none'; sh.style.transform = ''; sh.classList.remove('lf-sdrag');
+        requestAnimationFrame(() => { sh.style.transition = ''; });
+      }, ms);
+      return;
+    }
+    const h = home();
+    st.els.forEach((el) => { el.style.transition = tr; el.style.transform = 'translate3d(' + (commit ? W : 0) + 'px,0,0)'; });
+    h.style.transition = tr + ', --lf-dim ' + ms + 'ms'; h.style.transform = commit ? 'translate3d(0,0,0)' : 'translate3d(-30%,0,0)'; h.style.setProperty('--lf-dim', commit ? '0' : '0.45');
+    setTimeout(() => {
+      st.els.forEach((el) => { el.style.transition = ''; el.style.transform = ''; el.style.willChange = ''; });
+      h.style.transition = ''; h.style.transform = ''; h.style.removeProperty('--lf-dim');
+      document.body.classList.remove('lf-drag'); document.documentElement.classList.remove('lf-drag-root');
+      if (commit) setMode('home'); else h.hidden = true;
+    }, ms + 10);
+  }
+  document.addEventListener('touchstart', (e) => {
+    sw = null;
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0]; if (t.clientX > EDGE) return;
+    if ($('#lfSwitch') && !$('#lfSwitch').hidden) return;
+    if ($('#qmenu') && !$('#qmenu').hidden) return;
+    const sheet = topSheet();
+    if (!sheet && curMode() === 'home') return;
+    sw = { x0: t.clientX, y0: t.clientY, dx: 0, on: false, sheet, lastX: t.clientX, lastT: Date.now(), v: 0 };
+  }, { passive: true });
+  document.addEventListener('touchmove', (e) => {
+    if (!sw) return;
+    const t = e.touches[0]; const dx = t.clientX - sw.x0, dy = t.clientY - sw.y0;
+    if (!sw.on) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { sw = null; return; }
+      if (dx < 10) return;
+      sw.on = true; beginDrag();
+    }
+    if (e.cancelable) e.preventDefault();
+    const now = Date.now(); const v = (t.clientX - sw.lastX) / Math.max(1, now - sw.lastT);
+    sw.v = sw.v * 0.4 + v * 0.6; sw.lastX = t.clientX; sw.lastT = now;
+    sw.dx = Math.max(0, dx); dragTo(sw.dx);
+  }, { passive: false });
+  const endSwipe = () => {
+    if (!sw) return;
+    if (sw.on) { const W = window.innerWidth; finishDrag(sw.dx > W * 0.35 || (sw.v > 0.45 && sw.dx > 40)); }
+    sw = null;
+  };
+  document.addEventListener('touchend', endSwipe, { passive: true });
+  document.addEventListener('touchcancel', () => { if (sw && sw.on) finishDrag(false); sw = null; }, { passive: true });
 
   window.LIFE = { applyRemote, enqueueAll, exportData, importData, refresh, setMode, mode: curMode, openSearch };
 
