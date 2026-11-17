@@ -78,6 +78,8 @@
   const foodsOn = (d) => B.f.filter((x) => x.d === d).sort((a, b) => (a.t || '').localeCompare(b.t || ''));
   const exOn = (d) => B.x.filter((x) => x.d === d);
   const kcalOn = (d) => sum(foodsOn(d), (x) => Number(x.kcal) || 0);
+  const protOn = (d) => sum(foodsOn(d), (x) => Number(x.p) || 0);
+  const protTarget = () => Math.round((Number(prof().goalKg) || 70) * 2 / 5) * 5; // 2 g × น้ำหนักเป้า
   const weightOn = (d) => { const w = B.w.find((x) => x.d === d); return w ? Number(w.kg) : null; };
   function avg7(d) { const v = []; for (let i = 0; i < 7; i++) { const k = weightOn(addDays(d, -i)); if (k != null) v.push(k); } return v.length ? sum(v, (x) => x) / v.length : null; }
   const lastW = () => B.w.slice().sort((a, b) => b.d.localeCompare(a.d))[0] || null;
@@ -253,6 +255,7 @@
     h += '<div class="b-hero">' + ring(b.eaten, target) + '<div class="kv2">' +
       '<div><span>งบวันนี้</span><b>' + fmt(b.target) + (b.bonus ? ' <small class="b-lime">+' + fmt(b.bonus) + '</small>' : '') + '</b></div>' +
       '<div><span>กินแล้ว</span><b>' + fmt(b.eaten) + '</b></div>' +
+      '<div><span>โปรตีน</span><b' + (protOn(d) >= protTarget() ? ' class="b-lime"' : '') + '>' + fmt(protOn(d)) + ' <small style="color:var(--muted)">/ ' + protTarget() + ' g</small></b></div>' +
       '<div><span>ออกกำลังกาย' + (Number(p.exerciseCredit) ? ' (นับคืนครึ่งเดียว)' : ' (โบนัส ไม่นับคืน)') + '</span><b>' + (b.exercise ? '+' + fmt(b.exercise) : '0') + '</b></div></div></div>';
     h += '<div class="grid b-grid">' +
       '<div><span class="label">เฉลี่ย 7 วัน</span><b>' + (a7 != null ? fmt1(a7) : '–') + '</b><small>' + (wk != null ? (wk <= 0 ? '−' : '+') + fmt1(Math.abs(wk)) + ' กก./สัปดาห์' : 'กก.') + '</small></div>' +
@@ -274,7 +277,7 @@
         const items = foods.filter((x) => (x.meal || 'ของว่าง') === m); if (!items.length) return '';
         return '<h4>' + m + '<b>' + fmt(sum(items, (x) => Number(x.kcal) || 0)) + '</b></h4>' + items.map((x) => {
           const e = x.exp ? X.expenseById(x.exp) : null;
-          return '<button class="b-item" type="button" data-bf="' + esc(x.id) + '"><span><b>' + esc(x.name) + '</b><small>' + esc(x.t || '') + (outsideIF(x) ? ' · <span class="b-out">นอกช่วงกิน</span>' : '') + (e ? ' · ลงรายจ่าย ฿' + X.fmtB(e.amount) : '') + '</small></span><b>' + fmt(x.kcal) + '</b></button>';
+          return '<button class="b-item" type="button" data-bf="' + esc(x.id) + '"><span><b>' + esc(x.name) + '</b><small>' + esc(x.t || '') + (x.p != null ? ' · P ' + Math.round(x.p) + ' g' : '') + (outsideIF(x) ? ' · <span class="b-out">นอกช่วงกิน</span>' : '') + (e ? ' · ลงรายจ่าย ฿' + X.fmtB(e.amount) : '') + '</small></span><b>' + fmt(x.kcal) + '</b></button>';
         }).join('');
       }).join('') + '</div>';
     }
@@ -352,13 +355,13 @@
     const t = E.norm(fq);
     const list = E.DISHES.filter((d) => !t || E.norm(d.n).includes(t) || d.a.some((a) => E.norm(a).includes(t)));
     if (!list.length) return '<div class="empty"><b>ไม่พบในฐานข้อมูล</b>แตะ + แล้วพิมพ์วัตถุดิบกับวิธีปรุงแทนได้ เช่น “อกไก่ทอด 150g”</div>';
-    return list.map((d) => '<button class="b-item" type="button" data-bqtext="' + esc(d.n.replace(/\s*\(.*?\)/g, '')) + '"><span><b>' + esc(d.n) + '</b><small>' + esc(d.s) + ' · ' + esc(d.src) + '</small></span><b>' + fmt(d.k) + '</b></button>').join('');
+    return list.map((d) => '<button class="b-item" type="button" data-bqtext="' + esc(d.n.replace(/\s*\(.*?\)/g, '')) + '"><span><b>' + esc(d.n) + '</b><small>' + esc(d.s) + (d.p != null ? ' · P ' + d.p + ' · C ' + d.cb + ' · F ' + d.fat + ' g' : '') + '</small></span><b>' + fmt(d.k) + '</b></button>').join('');
   }
   function renderFood(el) {
     const fav = freqFoods();
     let h = '<div class="field" style="margin-top:6px"><input id="bfSearch" placeholder="ค้นหาเมนู เช่น ข้าวผัด" value="' + esc(fq) + '" autocomplete="off" aria-label="ค้นหาเมนู"></div>';
     if (fav.length) h += '<div class="h2">กินบ่อย<span>แตะเพื่อบันทึก</span></div><div class="recent">' + fav.map((x) => '<button type="button" class="rchip" data-bqtext="' + esc(x.name) + '"><span><b>' + esc(x.name) + '</b><small>' + fmt(x.kcal) + ' kcal · ' + x.n + ' ครั้ง</small></span></button>').join('') + '</div>';
-    h += '<div class="h2">เมนูสำเร็จ<span>kcal ต่อ 1 ที่</span></div><div class="b-db" id="bfList">' + foodListHTML() + '</div>';
+    h += '<div class="h2">เมนู ' + E.DISHES.length + ' รายการ<span>kcal ต่อ 1 ที่ · แตะดูส่วนประกอบ</span></div><div class="b-db" id="bfList">' + foodListHTML() + '</div>';
     h += '<div class="h2">วัตถุดิบ<span>kcal ต่อ 100 g</span></div><div class="panel"><div class="ledger">' + E.INGREDIENTS.map((i) => '<div><span>' + esc(i.n) + '<small style="display:block">ค่าเริ่มต้น ' + i.g + ' g ต่อที่ · ' + esc(i.src) + '</small></span><b>' + i.k + '</b></div>').join('') + '</div></div>';
     h += '<div class="h2">วิธีปรุง<span>บวกเพิ่มจากวัตถุดิบ</span></div><div class="panel"><div class="ledger">' + E.METHODS.map((m) => '<div><span>' + esc(m.n) + '<small style="display:block">' + esc(m.note) + '</small></span><b>' + (m.perServing != null ? '+' + m.perServing + '/ที่' : '+' + m.per100g + '/100 g') + '</b></div>').join('') + '</div></div>';
     h += '<div class="h2">แหล่งข้อมูล</div><div class="b-src">' + Object.keys(E.SRC).map((k) => '<div>' + k + ' = ' + (SRC_URL[k] ? '<a href="' + SRC_URL[k] + '" target="_blank" rel="noopener">' + esc(E.SRC[k]) + '</a>' : esc(E.SRC[k])) + '</div>').join('') + '<div style="margin-top:6px">ทุกค่าเป็นค่าประมาณ ร้านจริงอาจต่างได้ ±20–30%</div></div>';
@@ -460,6 +463,41 @@
     return subs.includes(s) ? s : '';
   };
   const cleanName = (t) => String(t || '').replace(/(?:฿\s*)?\d+(?:\.\d+)?\s*(?:บาท|บ\.?|฿)?\s*$/, '').trim() || String(t || '').trim();
+  // ส่วนประกอบที่ปรับเอง (กรัม / สลับมีหนัง-ไม่มีหนัง) ผูกกับข้อความที่พิมพ์
+  function qParts(r) {
+    if (!r || r.mode !== 'dish' || !r.parts) return null;
+    if (q.pk !== q.text) { q.pk = q.text; q.parts = null; }
+    return q.parts || r.parts;
+  }
+  function effective(r) {
+    const ps = qParts(r);
+    if (ps) {
+      const pl = ps.map((x) => E.partOf(x[0], x[1])).filter(Boolean), t = E.sumParts(pl);
+      return { kcal: Math.round(t.kcal), p: Math.round(t.p * 10) / 10, c: Math.round(t.c * 10) / 10, f: Math.round(t.f * 10) / 10, pl, lines: pl.filter((x) => x.g > 0).map((x) => [x.name + ' ' + x.g + ' g', x.kcal, 'N', x.p]) };
+    }
+    return { kcal: r.kcal, p: r.p, c: r.c, f: r.f, pl: null, lines: r.lines.map((l) => [l.label, l.kcal, l.src || '', l.p != null ? l.p : null]) };
+  }
+  function partsEditHTML(r) {
+    const ev = effective(r), base = r.parts || [];
+    return '<div class="b-prev"><div class="ln"><span style="color:var(--muted);font-size:12px">' + esc(r.dish) + '</span><span class="b-tag">แยกส่วนประกอบ</span></div>' +
+      ev.pl.map((x, i) => '<div class="ln b-pt' + (x.g ? '' : ' off') + '"><span>' + esc(x.name) + '<em>' + x.g + ' g</em><small>P ' + x.p + ' · C ' + x.c + ' · F ' + x.f + '</small></span>' +
+        '<span class="b-pq">' + (x.alt ? '<button type="button" data-bqp="' + i + '|s" aria-label="สลับเป็น ' + esc((E.COMP[x.alt] || [''])[0]) + '">สลับ</button>' : '') +
+        '<button type="button" data-bqp="' + i + '|-" aria-label="ลด ' + esc(x.name) + '">−</button><button type="button" data-bqp="' + i + '|+" aria-label="เพิ่ม ' + esc(x.name) + '">+</button></span><b>' + fmt(x.kcal) + '</b></div>').join('') +
+      '<div class="ln tot"><span>รวม · P ' + fmt(ev.p) + ' · C ' + fmt(ev.c) + ' · F ' + fmt(ev.f) + ' g</span><b>' + fmt(ev.kcal) + ' kcal</b></div>' +
+      (q.parts ? '<button type="button" class="ghost" data-bqp="0|r" style="align-self:flex-start;padding:4px 0;font-size:12.5px">คืนค่าเดิม</button>' : '') +
+      '<div class="b-src">± ทีละ 25% ของที่ปกติ · ' + esc(E.SRC.N) + '</div></div>';
+  }
+  function partStep(i, op) {
+    const a = analyse(); const r = a && a.food; if (!r || !r.parts) return;
+    const ps = (qParts(r) || []).map((x) => [x[0], x[1]]); const x = ps[i];
+    if (op === 'r') { q.parts = null; updateQuick(); return; }
+    if (!x) return;
+    const b0 = (r.parts[i] && r.parts[i][1]) || x[1] || 50, st = Math.max(5, Math.round(b0 * 0.25));
+    if (op === '+') x[1] = Math.round(x[1] + st);
+    else if (op === '-') x[1] = Math.max(0, Math.round(x[1] - st));
+    else if (op === 's') { const c = E.COMP[x[0]]; if (c && c[5]) x[0] = c[5]; }
+    q.parts = ps; q.pk = q.text; updateQuick();
+  }
   function updateQuick() {
     if (!q || q.kind === 'weight') return;
     const a = analyse();
@@ -470,10 +508,12 @@
       sg.innerHTML = list.map((d) => '<button type="button" class="chip b-chip" data-bqtext="' + esc(d.n.replace(/\s*\(.*?\)/g, '')) + '">' + esc(d.n) + ' · ' + fmt(d.k) + '</button>').join('');
       if (!q.text.trim()) pv.innerHTML = '';
       else if (r.mode === 'none') pv.innerHTML = '<div class="b-prev"><div class="ln"><span>ไม่รู้จักเมนูนี้</span><span class="b-tag none">ใส่ kcal เอง</span></div><div class="b-src">ลองพิมพ์วัตถุดิบ + วิธีปรุง เช่น “หมูทอด”, “อกไก่ต้ม 150g” หรือใส่ตัวเลขในช่องแก้ kcal ด้านล่าง</div></div>';
-      else pv.innerHTML = '<div class="b-prev"><div class="ln"><span style="color:var(--muted);font-size:12px">' + (r.mode === 'dish' ? 'จับได้ · เมนูสำเร็จ' : 'ประกอบจากวัตถุดิบ + วิธีปรุง') + '</span><span class="b-tag' + (r.mode === 'dish' ? '' : ' mid') + '">' + (r.mode === 'dish' ? 'แม่นยำสูง' : 'ประมาณการ') + '</span></div>' +
+      else if (r.mode === 'dish' && r.parts) pv.innerHTML = partsEditHTML(r);
+      else pv.innerHTML = '<div class="b-prev"><div class="ln"><span style="color:var(--muted);font-size:12px">ประกอบจากวัตถุดิบ + วิธีปรุง</span><span class="b-tag mid">ประมาณการ</span></div>' +
         r.lines.map((l) => '<div class="ln"><span>' + esc(l.label) + (l.src ? '<em>' + esc(l.src) + '</em>' : '') + '</span><b>' + (l.kcal > 0 && !l.base ? '+' : '') + fmt(l.kcal) + '</b></div>').join('') +
-        '<div class="ln tot"><span>รวม</span><b>' + fmt(r.kcal) + ' kcal</b></div></div>';
-      $('#bqKcal').placeholder = r.mode === 'none' ? 'จำเป็น' : String(r.kcal);
+        '<div class="ln tot"><span>รวม' + (r.p != null ? ' · P ' + fmt(r.p) + ' g' : '') + '</span><b>' + fmt(r.kcal) + ' kcal</b></div></div>';
+      const ev = effective(r);
+      $('#bqKcal').placeholder = r.mode === 'none' ? 'จำเป็น' : String(ev.kcal);
       // meal chips
       const meal = q.meal || r.meal;
       $('#bqMeals').innerHTML = MEALS.map((m) => '<button type="button" class="chip b-chip" data-bqmeal="' + m + '" aria-pressed="' + (meal === m) + '">' + m + (m === r.meal && !q.meal ? ' · อัตโนมัติ' : '') + '</button>').join('');
@@ -483,7 +523,7 @@
       if (!q.amountManual) $('#bqAmount').value = r.price != null ? String(r.price) : '';
       const sub = subFor(r, cleanName(q.text));
       $('#bqCat').textContent = 'หมวด: อาหาร/เครื่องดื่ม' + (sub ? ' › ' + sub : '') + ' · เลือกให้อัตโนมัติจากคำที่พิมพ์';
-      $('#bqSave').textContent = 'บันทึก' + (r.kcal || num(q.kcal) ? ' · ' + fmt(num(q.kcal) || r.kcal) + ' kcal' : '');
+      $('#bqSave').textContent = 'บันทึก' + (ev.kcal || num(q.kcal) ? ' · ' + fmt(num(q.kcal) || ev.kcal) + ' kcal' : '');
     } else {
       sg.innerHTML = EX.filter((e, i, arr) => arr.findIndex((z) => z[1] === e[1] && z[2] === e[2]) === i).slice(0, 8).map((e) => '<button type="button" class="chip b-chip" data-bqtext="' + esc(e[0]) + ' ">' + esc(e[0]) + '</button>').join('');
       const r = a.ex;
@@ -512,10 +552,11 @@
       upsert('x', { id: nid('x'), d: q.date, t: q.time, name: q.text.trim(), kcal: Math.round(kcal) });
       closeQuickSheet(); X.toast('บันทึกออกกำลังกาย +' + fmt(kcal) + ' kcal'); return;
     }
-    const r = a.food; const kcal = over != null ? over : r.kcal;
+    const r = a.food; const ev = effective(r); const kcal = over != null ? over : ev.kcal;
     if (!(kcal > 0) && r.mode === 'none') { X.toast('ไม่รู้จักเมนูนี้ ใส่ kcal เอง'); $('#bqKcal').focus(); return; }
     const name = cleanName(q.text);
-    const item = { id: nid('f'), d: q.date, t: q.time, name, kcal: Math.round(kcal), meal: q.meal || r.meal, src: over != null ? 'manual' : r.mode, lines: r.lines.map((l) => [l.label, l.kcal, l.src || '']) };
+    const item = { id: nid('f'), d: q.date, t: q.time, name, kcal: Math.round(kcal), meal: q.meal || r.meal, src: over != null ? 'manual' : r.mode, lines: ev.lines };
+    if (ev.p != null) { item.p = ev.p; item.c = ev.c; item.f = ev.f; }
     const moneyOn = $('#bqMoneyOn') && $('#bqMoneyOn').checked;
     let paid = null;
     if (moneyOn) {
@@ -545,7 +586,7 @@
       h += '<label class="field"><span>ชื่อ</span><input id="bxName" value="' + esc(it.name) + '"></label><label class="field"><span>kcal</span><input id="bxKcal" inputmode="numeric" value="' + esc(it.kcal) + '"></label>';
       if (kind === 'f') h += '<div class="field"><span>มื้อ</span><div class="chips">' + MEALS.map((m) => '<button type="button" class="chip b-chip" data-bxmeal="' + m + '" aria-pressed="' + (it.meal === m) + '">' + m + '</button>').join('') + '</div></div>';
       h += '<div class="row2"><label class="field"><span>วันที่</span><input type="date" id="bxDate" value="' + esc(it.d) + '"></label><label class="field"><span>เวลา</span><input type="time" id="bxTime" value="' + esc(it.t || '') + '"></label></div>';
-      if (kind === 'f' && Array.isArray(it.lines) && it.lines.length) h += '<div class="b-prev">' + it.lines.map((l) => '<div class="ln"><span>' + esc(l[0]) + (l[2] ? '<em>' + esc(l[2]) + '</em>' : '') + '</span><b>' + fmt(l[1]) + '</b></div>').join('') + '</div>';
+      if (kind === 'f' && Array.isArray(it.lines) && it.lines.length) h += '<div class="b-prev">' + it.lines.map((l) => '<div class="ln"><span>' + esc(l[0]) + (l[3] != null ? '<em>P ' + l[3] + '</em>' : l[2] ? '<em>' + esc(l[2]) + '</em>' : '') + '</span><b>' + fmt(l[1]) + '</b></div>').join('') + (it.p != null ? '<div class="ln tot"><span>P ' + fmt(it.p) + ' · C ' + fmt(it.c) + ' · F ' + fmt(it.f) + ' g</span><b>' + fmt(it.kcal) + ' kcal</b></div>' : '') + '</div>';
       if (kind === 'f' && it.exp) { const e = X.expenseById(it.exp); h += '<div class="b-src">' + (e ? 'ลิงก์กับรายจ่าย ฿' + X.fmtB(e.amount) + ' (' + esc(e.note || '') + ') · การลบตรงนี้ไม่ลบรายจ่าย ถ้าต้องการลบรายจ่ายให้ลบที่โหมด ฿' : 'รายจ่ายที่เคยลิงก์ไว้ถูกลบไปแล้ว') + '</div>'; }
     }
     h += '<button id="bxDel" class="danger" type="button">ลบรายการนี้</button>';
@@ -590,6 +631,7 @@
       const i = $('#bqText'); if (!i) return; i.value = ds.bqtext; q.text = ds.bqtext; updateQuick(); i.focus(); return;
     }
     if (ds.bqmeal && q) { q.meal = ds.bqmeal; updateQuick(); return; }
+    if (ds.bqp && q) { const [i, op] = ds.bqp.split('|'); partStep(Number(i), op); return; }
     if (ds.bqacct && q) { q.acct = ds.bqacct; $$('[data-bqacct]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.bqacct === q.acct))); return; }
     // edit sheet
     if (t.id === 'bxCancel') { closeEdit(); return; }

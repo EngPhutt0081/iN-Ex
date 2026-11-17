@@ -1,6 +1,6 @@
 /* iN&Ex service worker: app works offline; online opens always get the latest version */
-const V = 'inex-v8';
-const SHELL = ['./', './index.html', './body-engine.js?v=2', './body.js?v=4', './todo.js?v=2', './todo.css?v=2', './life.js?v=4', './life.css?v=2', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
+const V = 'inex-v9';
+const SHELL = ['./', './index.html', './food-db.js?v=1', './body-engine.js?v=3', './body.js?v=5', './todo.js?v=2', './todo.css?v=2', './life.js?v=5', './life.css?v=2', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });

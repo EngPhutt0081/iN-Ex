@@ -494,6 +494,13 @@ td.open{color:var(--gold);cursor:pointer}
 .b-prev .ln em{font-style:normal;color:var(--faint);font-size:11px;margin-left:6px;font-family:var(--f-num)}
 .b-prev .ln b{font-family:var(--f-num);font-weight:400;white-space:nowrap}
 .b-prev .tot{border-top:1px solid var(--line-2);padding-top:10px;margin-top:2px;align-items:baseline}
+.b-pt{align-items:center}
+.b-pt > span:first-child{display:flex;flex-direction:column;flex:1}
+.b-pt small{font-family:var(--f-num);font-size:11px;color:var(--muted)}
+.b-pt.off{opacity:.45}
+.b-pq{display:flex;gap:4px;flex:none}
+.b-pq button{min-width:34px;height:34px;border-radius:10px;border:1px solid var(--line-2);background:var(--raised);color:var(--ink);font-size:16px;padding:0 8px}
+.b-pq button[data-bqp$="|s"]{font-size:12px}
 .b-prev .tot b{font-size:24px;color:var(--lime)}
 .b-tag{display:inline-block;font-size:11px;border-radius:6px;padding:1px 7px;background:var(--lime);color:var(--lime-ink);font-weight:600}
 .b-tag.mid{background:none;border:1px solid var(--gold);color:var(--gold)}
@@ -2582,9 +2589,10 @@ window.INEX={
 };
 })();
 </script>
-<script src="body-engine.js?v=2"></script>
-<script src="body.js?v=4"></script>
+<script src="food-db.js?v=1"></script>
+<script src="body-engine.js?v=3"></script>
+<script src="body.js?v=5"></script>
 <script src="todo.js?v=2"></script>
-<script src="life.js?v=4"></script>
+<script src="life.js?v=5"></script>
 </body>
 </html>
