@@ -99,8 +99,99 @@
     const s = E.weightSlope(pts); return s == null ? null : s * 7;
   }
 
+  /* ---------- IF 16/8 eating window ---------- */
+  const hm2m = (s) => { const a = String(s || '').split(':').map(Number); return (a[0] || 0) * 60 + (a[1] || 0); };
+  const m2hm = (m) => { m = ((Math.round(m) % 1440) + 1440) % 1440; return pad(Math.floor(m / 60)) + ':' + pad(m % 60); };
+  const dur = (m) => { m = Math.max(0, Math.round(m)); const h = Math.floor(m / 60), r = m % 60; return h ? h + ' ชม.' + (r ? ' ' + r + ' นาที' : '') : r + ' นาที'; };
+  function ifWin() { const p = prof(); if (Number(p.ifOn) !== 1 || !/^\d\d:\d\d$/.test(p.ifStart || '') || !/^\d\d:\d\d$/.test(p.ifEnd || '')) return null; return { s: hm2m(p.ifStart), e: hm2m(p.ifEnd), start: p.ifStart, end: p.ifEnd }; }
+  // นอกช่วงกิน: ไม่นับเครื่องดื่มเกือบ 0 kcal (อเมริกาโน่ดำ น้ำเปล่า)
+  function outsideIF(x) {
+    const w = ifWin(); if (!w || !x.t || (Number(x.kcal) || 0) <= 15) return false;
+    const m = hm2m(x.t);
+    return w.s < w.e ? (m < w.s || m >= w.e) : (m < w.s && m >= w.e);
+  }
+  function ifBar(w, nowM) {
+    const pc = (m) => (m / 1440 * 100).toFixed(2) + '%';
+    return '<div class="b-ifbar" role="img" aria-label="ช่วงกิน ' + w.start + '–' + w.end + '"><i style="width:' + pc(w.s) + '"></i><i class="on" style="width:' + pc(w.e - w.s) + '"></i>' +
+      (nowM != null ? '<b class="now" style="left:' + pc(nowM) + '"></b>' : '') + '</div>' +
+      '<div class="b-iflab"><span style="left:0;transform:none">00:00</span><span style="left:' + pc(w.s) + '">' + w.start + '</span><span style="left:' + pc(w.e) + '">' + w.end + '</span></div>';
+  }
+  function ifCardHTML(d, isT) {
+    const w = ifWin(); if (!w) return '';
+    const out = foodsOn(d).filter(outsideIF);
+    if (!isT) return out.length ? '<div class="b-card" style="margin-top:12px"><span class="b-out">กินนอกช่วง ' + w.start + '–' + w.end + ' · ' + out.length + ' รายการ</span></div>' : '';
+    const now = new Date(), nm = now.getHours() * 60 + now.getMinutes();
+    let st, sub;
+    if (nm < w.s) { st = 'กำลังอด'; sub = 'เปิดกินอีก ' + dur(w.s - nm) + ' (' + w.start + ') · อดมาแล้ว ' + dur(nm + 1440 - w.e); }
+    else if (nm < w.e) { st = 'ช่วงกิน'; sub = 'ปิดอีก ' + dur(w.e - nm) + ' (' + w.end + ')'; }
+    else { st = 'ปิดแล้ว · อดต่อ'; sub = 'เปิดกินพรุ่งนี้ ' + w.start + ' (อีก ' + dur(1440 - nm + w.s) + ')'; }
+    const eating = nm >= w.s && nm < w.e;
+    return '<div class="b-card' + (eating ? ' lime' : '') + '" style="margin-top:12px"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><b>IF 16/8 · ' + st + '</b><span class="b-src">' + w.start + '–' + w.end + '</span></div>' +
+      ifBar(w, nm) + '<div class="b-src">' + sub + '</div>' +
+      (out.length ? '<div class="b-src b-out" style="margin-top:4px">วันนี้กินนอกช่วง ' + out.length + ' รายการ</div>' : '') + '</div>';
+  }
+
+  /* ---------- my plan (แผนของฉัน) ---------- */
+  const PLAN_MENU = [
+    ['มื้อแรก', ['กะเพราอกไก่ ข้าวน้อย ไข่ต้ม', 'ข้าวมันไก่ต้ม ข้าวน้อย', 'ก๋วยเตี๋ยวน้ำใส', 'ผัดผักรวมกุ้ง ข้าวน้อย']],
+    ['ของว่าง (7-11)', ['อกไก่ CP 2 ซอง', 'ไข่ต้ม 2 ฟอง', 'กรีกโยเกิร์ต', 'นมถั่วเหลืองไม่หวาน', 'กล้วย', 'เวย์โปรตีน']],
+    ['หลังวิ่ง', ['ไก่ย่าง ส้มตำ ข้าวน้อย', 'ปลาเผา ผักลวก ข้าวน้อย', 'สุกี้น้ำ ข้าวน้อย', 'ข้าวต้มปลา ไข่ต้ม', 'ต้มยำน้ำใส ไก่ย่าง ข้าวน้อย']],
+  ];
+  const PLAN_AVOID = ['ของทอดทุกชนิด', 'แกงกะทิ', 'ไข่ดาว/ไข่เจียว', 'ชานม ชาเย็น', 'น้ำหวาน น้ำอัดลม', 'น้ำผลไม้', 'ขนมหวาน เบเกอรี่', 'ขนมกรุบกรอบ', 'หมูกระทะ/บุฟเฟ่ต์', 'ข้าวเหนียว', 'แอลกอฮอล์'];
+  const PLAN_ORDER = [['“ข้าวน้อย”', 'ทุกครั้ง'], ['“น้ำมันน้อย”', 'ทุกจานผัด'], ['“ไข่ต้ม”', 'แทนไข่ดาว'], ['อกไก่ / กุ้ง / ปลา', 'แทนหมูสามชั้น'], ['โปรตีนเท่าฝ่ามือ', 'ทุกมื้อ']];
+  const PLAN_LEGS = [['Squat', '3×15', 'ลงลึกเท่านั่งเก้าอี้ หลังตรง'], ['Lunge สลับขา', '3×12/ข้าง', 'เข่าไม่เลยปลายเท้า'], ['Glute Bridge', '3×15', 'บีบก้นค้าง 2 วินาที'], ['Wall Sit', '3×30–45 วิ', 'พิงผนัง เข่า 90°'], ['Side-lying Leg Raise', '2×15/ข้าง', 'นอนตะแคง ยกขาช้าๆ']];
+  function planStartKg() {
+    const p = prof(), ps = p.planStart || '';
+    const w = B.w.filter((x) => x.d >= ps).sort((a, b) => a.d.localeCompare(b.d))[0];
+    return w ? Number(w.kg) : Number(p.kg);
+  }
+  function planHTML() {
+    const p = prof(), today = X.todayISO(), b = calc(today), w = ifWin();
+    const target = b.target, cur = B.w.length ? curKg() : Number(p.kg), start = planStartKg();
+    const mid = Number(p.midKg) || null, goal = Number(p.goalKg);
+    const prog = (to) => Math.max(0, Math.min(100, (start - cur) / Math.max(0.1, start - to) * 100));
+    const pro = Math.round(goal * 2 / 5) * 5, fat = Math.round(target * 0.27 / 9 / 5) * 5, carb = Math.max(0, Math.round((target - pro * 4 - fat * 9) / 4 / 5) * 5);
+    let h = '<div class="b-card lime" style="margin-top:6px"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><b>แผนของฉัน · IF 16/8</b><span class="b-src">' + (p.planStart ? 'เริ่ม ' + shortD(p.planStart) + ' ' + (parseD(p.planStart).getFullYear() + 543) : '') + '</span></div>' +
+      '<div class="b-wts"><div><small>เริ่ม</small><b>' + fmt1(start) + '</b></div><div><small>ตอนนี้</small><b class="b-lime">' + fmt1(cur) + '</b></div>' + (mid ? '<div><small>เป้าแรก</small><b>' + fmt1(mid) + '</b></div>' : '') + '<div><small>เป้าสุดท้าย</small><b>' + fmt1(goal) + '</b></div></div>' +
+      (mid ? '<div class="b-src">ถึงเป้าแรกแล้ว ' + Math.round(prog(mid)) + '%</div><div class="b-prog"><i style="width:' + prog(mid).toFixed(1) + '%"></i></div>' : '') +
+      '<div class="b-src" style="margin-top:6px">ถึงเป้าสุดท้ายแล้ว ' + Math.round(prog(goal)) + '%</div><div class="b-prog"><i style="width:' + prog(goal).toFixed(1) + '%"></i></div></div>';
+    h += '<div class="grid b-grid" style="margin-top:12px"><div><span class="label">กินต่อวัน</span><b class="b-lime">' + fmt(target) + '</b><small>kcal</small></div>' +
+      '<div><span class="label">TDEE</span><b>' + fmt(b.tdee) + '</b><small>ไม่รวมวิ่ง</small></div>' +
+      '<div><span class="label">ลด/สัปดาห์</span><b>' + b.kgPerWeek + '</b><small>กก. + วิ่งเป็นโบนัส</small></div></div>';
+    h += '<div class="h2">สารอาหารต่อวัน<span>โปรตีน 2 g × น้ำหนักเป้า</span></div><div class="panel"><div class="b-mac"><i style="flex:' + pro * 4 + ';background:var(--lime)"></i><i style="flex:' + carb * 4 + ';background:var(--ink)"></i><i style="flex:' + fat * 9 + ';background:var(--faint)"></i></div>' +
+      '<div class="b-mac3"><div><small class="b-lime">โปรตีน</small><b>' + pro + ' g</b><small>สำคัญสุด</small></div><div><small>คาร์บ</small><b>' + carb + ' g</b><small>ข้าว ~1 ทัพพี/มื้อ</small></div><div><small>ไขมัน</small><b>' + fat + ' g</b><small>เลี่ยงทอด/กะทิ</small></div></div></div>';
+    if (w) {
+      const snack = Math.round((w.s + (w.e - w.s) * 0.45) / 30) * 30, run = w.e - 120, dinner = w.e - 45;
+      h += '<div class="h2">ช่วงเวลากิน<span>' + w.start + '–' + w.end + ' · อด 16 ชม.</span></div><div class="panel">' + ifBar(w, null) + '<div class="ledger" style="margin-top:8px">' +
+        '<div><span>ก่อน ' + w.start + ' อด · น้ำเปล่า + อเมริกาโน่ดำ</span><b>0</b></div>' +
+        '<div><span>' + w.start + ' มื้อแรก</span><b>~' + fmt(Math.round(target * 0.36 / 10) * 10) + '</b></div>' +
+        '<div><span>' + m2hm(snack) + ' ของว่างโปรตีน · กาแฟแก้วสุดท้าย</span><b>~' + fmt(Math.round(target * 0.18 / 10) * 10) + '</b></div>' +
+        '<div><span>' + m2hm(run) + ' วิ่ง 6–7 กม. pace สบาย</span><b class="b-lime">โบนัส</b></div>' +
+        '<div><span>' + m2hm(dinner) + ' มื้อหลังวิ่ง</span><b>~' + fmt(Math.round(target * 0.46 / 10) * 10) + '</b></div>' +
+        '<div><span>' + w.end + ' ปิดหน้าต่างกิน · วิดพื้น + ท่าต้นขา</span><b></b></div></div></div>';
+    }
+    h += '<div class="h2">เมนูแนะนำ<span>แตะเพื่อบันทึก · kcal</span></div>' + PLAN_MENU.map((m) => '<div class="b-card" style="margin-bottom:10px"><b>' + m[0] + '</b><div class="b-pcs">' +
+      m[1].map((t) => '<button type="button" class="b-pc" data-bqtext="' + esc(t) + '">' + esc(t) + '<small>' + fmt(E.match(t).kcal) + '</small></button>').join('') + '</div></div>').join('');
+    h += '<div class="h2">ควรงด</div><div class="b-pcs">' + PLAN_AVOID.map((t) => '<span class="b-pc bad">' + esc(t) + '</span>').join('') + '</div>';
+    h += '<div class="h2">สั่งร้านตามสั่ง</div><div class="panel"><div class="ledger">' + PLAN_ORDER.map((r) => '<div><span class="b-lime">' + r[0] + '</span><b style="font-family:var(--f-body);color:var(--muted)">' + r[1] + '</b></div>').join('') + '</div></div>';
+    h += '<div class="h2">ลดต้นขา<span>3 วัน/สัปดาห์ ~15 นาที</span></div><div class="panel"><p class="b-src" style="margin:0 0 6px">เลือกลดไขมันเฉพาะจุดไม่ได้ ต้นขาจะเล็กลงเมื่อไขมันทั้งตัวลด ตัวหลักคือคุมงบแคลอรี่ + วิ่ง ท่าข้างล่างช่วยให้ขาแน่น ไม่ย้วย · ลดเค็มช่วยให้ขาบวมน้ำน้อยลง</p><div class="ledger">' +
+      PLAN_LEGS.map((r) => '<div><span><span style="color:var(--ink)">' + r[0] + '</span><small style="display:block">' + r[2] + '</small></span><b class="b-lime">' + r[1] + '</b></div>').join('') + '</div><p class="b-src" style="margin:8px 0 0">บันทึกได้ที่ + → ออกกำลังกาย เช่น “ท่าต้นขา 15 นาที” หรือ “วิดพื้น 70 ครั้ง”</p></div>';
+    h += '<div class="h2">กฎประจำวัน</div><div class="b-rules">' + [['2.5–3 ลิตร', 'น้ำเปล่าต่อวัน'], ['7 ชม.+', 'นอน (นอนน้อย = หิว)'], ['3–4 วัน', 'วิ่ง/สัปดาห์'], ['ทุกเช้า', 'ชั่งหลังเข้าห้องน้ำ']].map((r) => '<div class="b-card"><b class="b-lime">' + r[0] + '</b><small>' + r[1] + '</small></div>').join('') + '</div>';
+    // checkpoints: end of each month from plan start, projected vs actual 7-day average
+    if (p.planStart) {
+      const ps = parseD(p.planStart), rows = [];
+      for (let k = 1; k <= 5; k++) {
+        const e = new Date(ps.getFullYear(), ps.getMonth() + k, 0), d = iso(e);
+        const wk = (e - ps) / 864e5 / 7, proj = Math.max(goal, start - b.kgPerWeek * wk), act = d <= today ? avg7(d) : null;
+        rows.push('<div><span>สิ้น ' + TH_MS[e.getMonth()] + ' ' + String(e.getFullYear() + 543).slice(2) + '</span><b>คาด ' + fmt1(proj) + (act != null ? ' · <span class="' + (act <= proj + 0.3 ? 'b-lime' : 'b-out') + '">จริง ' + fmt1(act) + '</span>' : '') + '</b></div>');
+      }
+      h += '<div class="h2">Checkpoint<span>คาดจากขาดดุล ไม่รวมวิ่ง</span></div><div class="panel"><div class="ledger"><div><span>' + shortD(p.planStart) + ' เริ่ม</span><b>' + fmt1(start) + '</b></div>' + rows.join('') + '</div></div>';
+    }
+    return h;
+  }
+
   /* ---------- exercise parsing ---------- */
-  const EX = [['วิ่ง', 9.8, 'run'], ['เดินเร็ว', 4.3, 'walk'], ['เดิน', 3.5, 'walk'], ['ปั่นจักรยาน', 7.5], ['ปั่น', 7.5], ['ว่ายน้ำ', 7], ['เล่นเวท', 5], ['เวท', 5], ['ยิม', 5], ['ฟิตเนส', 5], ['แบดมินตัน', 5.5], ['แบด', 5.5], ['ฟุตบอล', 7], ['บอล', 7], ['บาส', 6.5], ['โยคะ', 2.5], ['hiit', 8], ['กระโดดเชือก', 11]];
+  const EX = [['วิ่ง', 9.8, 'run'], ['เดินเร็ว', 4.3, 'walk'], ['เดิน', 3.5, 'walk'], ['ปั่นจักรยาน', 7.5], ['ปั่น', 7.5], ['ว่ายน้ำ', 7], ['เล่นเวท', 5], ['เวท', 5], ['ยิม', 5], ['ฟิตเนส', 5], ['แบดมินตัน', 5.5], ['แบด', 5.5], ['ฟุตบอล', 7], ['บอล', 7], ['บาส', 6.5], ['โยคะ', 2.5], ['hiit', 8], ['กระโดดเชือก', 11], ['วิดพื้น', 3.8, 'rep'], ['สควอท', 5], ['สควอต', 5], ['บอดี้เวท', 3.5], ['ซิทอัพ', 3.8], ['เล่นหน้าท้อง', 3.8], ['ท่าต้นขา', 4]];
   function exParse(text, kg) {
     const t = String(text || '').toLowerCase();
     const hit = EX.find((e) => t.includes(e[0]));
@@ -110,7 +201,9 @@
     const hr = t.match(/(\d+(?:\.\d+)?)\s*(?:ชม\.?|ชั่วโมง|hr)/);
     const minutes = (mn ? Number(mn[1]) : 0) + (hr ? Number(hr[1]) * 60 : 0);
     let kcal = null, how = '';
-    if (km && hit[2] === 'run') { kcal = kg * Number(km[1]); how = 'วิ่ง ≈ น้ำหนัก × ระยะทาง (' + fmt1(kg) + ' × ' + km[1] + ' กม.)'; }
+    const reps = t.match(/(\d+)\s*(?:ครั้ง|ที|reps?)/);
+    if (!minutes && reps && hit[2] === 'rep') { kcal = 0.45 * Number(reps[1]) * kg / 70; how = 'ประมาณ 0.45 kcal ต่อครั้ง (ที่ 70 กก.) × ' + reps[1] + ' ครั้ง'; }
+    else if (km && hit[2] === 'run') { kcal = kg * Number(km[1]); how = 'วิ่ง ≈ น้ำหนัก × ระยะทาง (' + fmt1(kg) + ' × ' + km[1] + ' กม.)'; }
     else if (km && hit[2] === 'walk') { kcal = 0.5 * kg * Number(km[1]); how = 'เดิน ≈ 0.5 × น้ำหนัก × ระยะทาง'; }
     else if (minutes) { kcal = (hit[1] - 1) * kg * minutes / 60; how = 'MET ' + hit[1] + ' (หักส่วนที่ร่างกายใช้อยู่แล้ว) × ' + fmt1(kg) + ' กก. × ' + Math.round(minutes) + ' นาที'; }
     return { name: hit[0], kcal: kcal == null ? null : Math.round(kcal), how };
@@ -165,6 +258,7 @@
       '<div><span class="label">เฉลี่ย 7 วัน</span><b>' + (a7 != null ? fmt1(a7) : '–') + '</b><small>' + (wk != null ? (wk <= 0 ? '−' : '+') + fmt1(Math.abs(wk)) + ' กก./สัปดาห์' : 'กก.') + '</small></div>' +
       '<div><span class="label">TDEE</span><b>' + fmt(b.tdee) + '</b><small>' + (b.tdeeAdaptive != null ? 'จากข้อมูลจริง ' + b.logged + ' วัน' : 'สูตร · อีก ' + Math.max(0, 14 - b.logged) + ' วันใช้ค่าจริง') + '</small></div>' +
       '<div><span class="label">ขาดดุล</span><b>−' + fmt(p.deficit) + '</b><small>≈ ' + b.kgPerWeek + ' กก./สัปดาห์</small></div></div>';
+    h += ifCardHTML(d, isT);
     const w = weightOn(d);
     if (w == null) {
       h += '<div class="b-card lime" style="margin-top:12px"><b>ชั่งน้ำหนัก' + (isT ? 'วันนี้' : 'วันนี้ (' + shortD(d) + ')') + '</b><div class="b-src">ชั่งตอนเช้าหลังเข้าห้องน้ำ ก่อนกินอะไร จะเทียบกันได้แม่นที่สุด</div>' +
@@ -180,7 +274,7 @@
         const items = foods.filter((x) => (x.meal || 'ของว่าง') === m); if (!items.length) return '';
         return '<h4>' + m + '<b>' + fmt(sum(items, (x) => Number(x.kcal) || 0)) + '</b></h4>' + items.map((x) => {
           const e = x.exp ? X.expenseById(x.exp) : null;
-          return '<button class="b-item" type="button" data-bf="' + esc(x.id) + '"><span><b>' + esc(x.name) + '</b><small>' + esc(x.t || '') + (e ? ' · ลงรายจ่าย ฿' + X.fmtB(e.amount) : '') + '</small></span><b>' + fmt(x.kcal) + '</b></button>';
+          return '<button class="b-item" type="button" data-bf="' + esc(x.id) + '"><span><b>' + esc(x.name) + '</b><small>' + esc(x.t || '') + (outsideIF(x) ? ' · <span class="b-out">นอกช่วงกิน</span>' : '') + (e ? ' · ลงรายจ่าย ฿' + X.fmtB(e.amount) : '') + '</small></span><b>' + fmt(x.kcal) + '</b></button>';
         }).join('');
       }).join('') + '</div>';
     }
@@ -274,7 +368,7 @@
   /* ---------- goal ---------- */
   function readGoal() {
     if (!gform) return;
-    ['age', 'cm', 'kg', 'goalKg'].forEach((k) => { const i = $('#bg-' + k); if (i) gform[k] = i.value; });
+    ['age', 'cm', 'kg', 'goalKg', 'midKg', 'planStart', 'ifStart', 'ifEnd'].forEach((k) => { const i = $('#bg-' + k); if (i) gform[k] = i.value; });
   }
   function renderGoal(el) {
     if (!gform) gform = Object.assign({}, prof());
@@ -285,10 +379,12 @@
     const b = ok ? E.budget({ profile: pv, days, deficit: Number(g.deficit) || 500, eaten: 0 }) : null;
     const seg = (key, opts) => '<div class="b-seg">' + opts.map((o) => '<button type="button" data-bg="' + key + '|' + o[0] + '" aria-pressed="' + (String(g[key]) === String(o[0])) + '">' + o[1] + (o[2] ? '<small>' + o[2] + '</small>' : '') + '</button>').join('') + '</div>';
     const rate = (d) => (Math.round(d * 7 / 7700 * 100) / 100).toFixed(2);
-    let h = '<div class="sheet-body" style="padding:6px 0 0;gap:16px">';
+    let h = planHTML() + '<div class="h2" style="margin-top:34px">ตั้งค่าเป้าหมาย<span>ตัวเลขในแผนเปลี่ยนตาม</span></div>';
+    h += '<div class="sheet-body" style="padding:6px 0 0;gap:16px">';
     h += '<div class="field"><span>เพศ</span>' + seg('sex', [['male', 'ชาย'], ['female', 'หญิง']]) + '</div>';
     h += '<div class="row2"><label class="field"><span>อายุ (ปี)</span><input id="bg-age" inputmode="numeric" value="' + esc(g.age) + '"></label><label class="field"><span>ส่วนสูง (ซม.)</span><input id="bg-cm" inputmode="decimal" value="' + esc(g.cm) + '"></label></div>';
-    h += '<div class="row2"><label class="field"><span>น้ำหนักเริ่มต้น (กก.)</span><input id="bg-kg" inputmode="decimal" value="' + esc(g.kg) + '"></label><label class="field"><span>เป้าหมาย (กก.)</span><input id="bg-goalKg" inputmode="decimal" value="' + esc(g.goalKg) + '"></label></div>';
+    h += '<div class="row2"><label class="field"><span>น้ำหนักเริ่มต้น (กก.)</span><input id="bg-kg" inputmode="decimal" value="' + esc(g.kg) + '"></label><label class="field"><span>วันเริ่มแผน</span><input id="bg-planStart" type="date" value="' + esc(g.planStart || '') + '"></label></div>';
+    h += '<div class="row2"><label class="field"><span>เป้าแรก (กก.)</span><input id="bg-midKg" inputmode="decimal" value="' + esc(g.midKg == null ? '' : g.midKg) + '"></label><label class="field"><span>เป้าสุดท้าย (กก.)</span><input id="bg-goalKg" inputmode="decimal" value="' + esc(g.goalKg) + '"></label></div>';
     if (B.w.length) h += '<div class="hint" style="margin-top:-6px">คำนวณ BMR จากน้ำหนักเฉลี่ยล่าสุด ' + fmt1(curKg()) + ' กก. (ไม่ใช่น้ำหนักเริ่มต้น)</div>';
     h += '<div class="field"><span>กิจกรรมในวันปกติ (ไม่รวมออกกำลังกาย)</span>' + seg('activity', [[1.2, 'นั่งทั้งวัน', '×1.2'], [1.3, 'นั่งสลับเดิน', '×1.3'], [1.375, 'เดินเยอะ', '×1.375']]) + '</div>';
     h += '<div class="field"><span>ขาดดุลต่อวัน</span>' + seg('deficit', [[300, '−300', rate(300) + ' กก./สัปดาห์'], [500, '−500', rate(500) + ' กก./สัปดาห์'], [750, '−750', rate(750) + ' กก./สัปดาห์']]) + '</div>';
@@ -302,13 +398,18 @@
         '<div class="total"><span>เป้ากินต่อวัน' + (b.floored ? ' (ขั้นต่ำ)' : '') + '</span><b class="b-lime">' + fmt(b.target) + '</b></div></div>' +
         '<p class="b-src" style="margin:10px 0 0">ไม่ให้เป้าต่ำกว่า ' + (pv.sex === 'female' ? '1,200' : '1,500') + ' kcal/วัน · ลดได้ราว ' + b.kgPerWeek + ' กก./สัปดาห์</p></div>';
     }
+    h += '<div class="field"><span>IF (Intermittent Fasting)</span>' + seg('ifOn', [[1, 'เปิด'], [0, 'ปิด']]) + '</div>';
+    if (Number(g.ifOn) === 1) h += '<div class="row2"><label class="field"><span>เริ่มกิน</span><input id="bg-ifStart" type="time" value="' + esc(g.ifStart || '') + '"></label><label class="field"><span>หยุดกิน</span><input id="bg-ifEnd" type="time" value="' + esc(g.ifEnd || '') + '"></label></div>';
     h += '<button class="b-btn wide" id="bgSave" type="button" style="padding:14px">บันทึกเป้าหมาย</button></div>';
     el.innerHTML = h;
   }
   function saveGoal() {
     readGoal(); const g = gform; const n = (k) => num(g[k]);
     if (!(n('age') > 0) || !(n('cm') > 0) || !(n('kg') > 0) || !(n('goalKg') > 0)) { X.toast('ใส่อายุ ส่วนสูง น้ำหนัก และเป้าหมายให้ครบ'); return; }
-    saveProfile({ sex: g.sex, age: n('age'), cm: n('cm'), kg: n('kg'), goalKg: n('goalKg'), activity: Number(g.activity), deficit: Number(g.deficit), exerciseCredit: Number(g.exerciseCredit) });
+    const hmOk = (v) => /^\d\d:\d\d$/.test(String(v || ''));
+    if (Number(g.ifOn) === 1 && (!hmOk(g.ifStart) || !hmOk(g.ifEnd) || hm2m(g.ifStart) >= hm2m(g.ifEnd))) { X.toast('ใส่เวลาเริ่มกินและหยุดกินให้ถูก (เริ่มก่อนหยุด)'); return; }
+    const mid = n('midKg');
+    saveProfile({ sex: g.sex, age: n('age'), cm: n('cm'), kg: n('kg'), goalKg: n('goalKg'), midKg: mid > 0 ? mid : null, planStart: /^\d{4}-\d\d-\d\d$/.test(g.planStart || '') ? g.planStart : '', activity: Number(g.activity), deficit: Number(g.deficit), exerciseCredit: Number(g.exerciseCredit), ifOn: Number(g.ifOn) === 1 ? 1 : 0, ifStart: g.ifStart || '', ifEnd: g.ifEnd || '' });
     gform = null; render(); X.toast('บันทึกเป้าหมายแล้ว');
   }
 

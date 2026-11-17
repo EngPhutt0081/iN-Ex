@@ -55,6 +55,20 @@
     { n: 'ไก่ทอด 1 น่อง', a: ['ไก่ทอด'], k: 345, s: '1 น่อง', c: 'food', src: 'W', unit: 'น่อง' },
     { n: 'ไข่ตุ๋น', a: ['ไข่ตุ๋น'], k: 75, s: '1 ถ้วย', c: 'food', src: 'W' },
     { n: 'ส้มตำไทย', a: ['ส้มตำ', 'ตำไทย', 'ตำ'], k: 120, s: '1 จาน', c: 'food', src: 'E' },
+    // เมนูคุมแคลอรี่ (แผน IF 16/8 · พ.ย. 2569) ประมาณการจากวัตถุดิบ + วิธีปรุง
+    { n: 'ข้าวกะเพราอกไก่', a: ['กะเพราอกไก่'], k: 510, s: '1 จาน', c: 'food', src: 'E' },
+    { n: 'ข้าวราดผัดผักรวมกุ้ง', a: ['ผัดผักรวมกุ้ง', 'ผัดผักรวม'], k: 450, s: '1 จาน', c: 'food', src: 'E' },
+    { n: 'ก๋วยเตี๋ยวน้ำใส เนื้อ/ลูกชิ้น', a: ['ก๋วยเตี๋ยวน้ำใส', 'เตี๋ยวน้ำใส'], k: 300, s: '1 ชาม', c: 'food', src: 'E' },
+    { n: 'อกไก่ซอง (7-11)', a: ['อกไก่ซอง', 'อกไก่ cp', 'อกไก่ซีพี', 'อกไก่ 7-11', 'อกไก่เซเว่น'], k: 110, s: '1 ซอง', c: 'food', src: 'E', unit: 'ซอง' },
+    { n: 'กรีกโยเกิร์ต', a: ['กรีกโยเกิร์ต', 'โยเกิร์ต'], k: 100, s: '1 ถ้วย', c: 'food', src: 'E', unit: 'ถ้วย' },
+    { n: 'กล้วยหอม', a: ['กล้วยหอม', 'กล้วย'], k: 105, s: '1 ลูก', c: 'food', src: 'U', unit: 'ลูก' },
+    { n: 'ไก่ย่าง (1 ชิ้น)', a: ['ไก่ย่าง'], k: 200, s: '1 ชิ้น', c: 'food', src: 'E', unit: 'ชิ้น' },
+    { n: 'ปลาเผา (ตัวเล็ก)', a: ['ปลาเผา'], k: 280, s: '1 ตัว', c: 'food', src: 'E' },
+    { n: 'สุกี้น้ำ', a: ['สุกี้น้ำ', 'สุกี้'], k: 350, s: '1 ชาม', c: 'food', src: 'E' },
+    { n: 'ข้าวต้มปลา', a: ['ข้าวต้มปลา'], k: 300, s: '1 ชาม', c: 'food', src: 'E' },
+    { n: 'ข้าวต้มกุ้ง', a: ['ข้าวต้มกุ้ง'], k: 290, s: '1 ชาม', c: 'food', src: 'E' },
+    { n: 'ต้มยำน้ำใส (ไม่รวมข้าว)', a: ['ต้มยำน้ำใส', 'ต้มยำ'], k: 150, s: '1 ถ้วย', c: 'food', src: 'E' },
+    { n: 'ผักลวก', a: ['ผักลวก'], k: 40, s: '1 จาน', c: 'food', src: 'E' },
     // ของกินเล่น / เช้า
     { n: 'แซนด์วิชทูน่า', a: ['แซนด์วิช', 'แซนวิช'], k: 180, s: '1 ชิ้น', c: 'food', src: 'W' },
     { n: 'ไส้กรอก', a: ['ไส้กรอก'], k: 100, s: '1 อัน', c: 'food', src: 'T', unit: 'อัน' },
@@ -85,6 +99,8 @@
     { n: 'น้ำเปล่า', a: ['น้ำเปล่า', 'น้ำดื่ม'], k: 0, s: '1 ขวด', c: 'drink', src: 'E' },
     { n: 'น้ำส้มคั้น', a: ['น้ำส้ม', 'น้ำผลไม้'], k: 112, s: '250 ml', c: 'drink', src: 'U' },
     { n: 'นมจืด', a: ['นมจืด', 'นมสด', 'นม'], k: 150, s: '1 แก้ว 240 ml', c: 'drink', src: 'S' },
+    { n: 'นมถั่วเหลืองไม่หวาน', a: ['นมถั่วเหลืองไม่หวาน', 'นมถั่วเหลือง', 'นมถั่ว'], k: 90, s: '1 กล่อง', c: 'drink', src: 'E' },
+    { n: 'เวย์โปรตีน 1 สกู๊ป', a: ['เวย์โปรตีน', 'เวย์', 'whey'], k: 120, s: '1 สกู๊ป', c: 'drink', src: 'E' },
     { n: 'นมพร่องมันเนย', a: ['นมพร่องมันเนย', 'นมพร่อง', 'นมโลว์แฟต'], k: 120, s: '1 แก้ว 240 ml', c: 'drink', src: 'S' },
   ];
 
@@ -132,6 +148,7 @@
     { n: 'ไข่เจียว', a: ['ไข่เจียว'], k: 165, src: 'E' },
     { n: 'ไข่ต้ม', a: ['ไข่ต้ม'], k: 76, src: 'W' },
     { n: 'ไข่ข้น/ไข่ยางมะตูม', a: ['ไข่ยางมะตูม', 'ไข่ลวก'], k: 76, src: 'W' },
+    { n: 'ข้าวน้อย (−1 ทัพพี)', a: ['ข้าวน้อย', 'ข้าวครึ่ง'], k: -80, src: 'S' },
     { n: 'ข้าวพิเศษ (+1 ทัพพี)', a: ['ข้าวพิเศษ', 'เพิ่มข้าว'], k: 80, src: 'S' },
     { n: 'ไม่ใส่ไข่', a: ['ไม่ใส่ไข่', 'ไม่เอาไข่'], k: -76, src: 'W' },
     { n: 'พิเศษ (เพิ่มเนื้อ)', a: ['พิเศษ'], k: 100, src: 'E' },
@@ -195,7 +212,7 @@
     const out = { price: null, qty: 1, qtyGiven: false, grams: null };
     const g = s.match(/(\d+(?:\.\d+)?)\s*(?:g|กรัม|ก\.)/i);
     if (g) { out.grams = parseFloat(g[1]); s = s.replace(g[0], ' '); }
-    const q = s.match(/(?:x|×)\s*(\d+)|(\d+)\s*(?:ไม้|ชิ้น|จาน|ชาม|แก้ว|ถ้วย|ฟอง|อัน|น่อง|ลูก|คู่|แผ่น|ขวด|กระป๋อง|ห่อ|ที่)/i);
+    const q = s.match(/(?:x|×)\s*(\d+)|(\d+)\s*(?:ไม้|ชิ้น|จาน|ชาม|แก้ว|ถ้วย|ฟอง|อัน|น่อง|ลูก|คู่|แผ่น|ขวด|กระป๋อง|ห่อ|ซอง|กล่อง|สกู๊ป|ที่)/i);
     if (q) { out.qty = parseInt(q[1] || q[2], 10); out.qtyGiven = true; s = s.replace(q[0], ' '); }
     const p = s.match(/(?:฿\s*)?(\d+(?:\.\d+)?)\s*(?:บาท|บ\.?|฿)?/);
     if (p) { out.price = parseFloat(p[1]); s = s.replace(p[0], ' '); }
@@ -210,6 +227,7 @@
   const DISH_IDX = DISHES.map((d) => ({ ...d, a: d.a.concat(d.n.replace(/\(.*?\)|\d+.*$/g, '')) }));
   const EGG_ADDONS = ADDONS.filter((x) => x.k > 0 && /ไข่/.test(x.n));
   const CARBS = INGREDIENTS.filter((x) => x.t === 'carb');
+  const RICE_MODS = ADDONS.filter((x) => /^ข้าว/.test(x.n)); // ข้าวน้อย / ข้าวพิเศษ: ต้องไม่ถูกอ่านเป็นวัตถุดิบ "ข้าว" หรือ "พิเศษ"
 
   // วัตถุดิบที่คร่อมคำเมนูแต่ไม่ได้อยู่ในคำเมนู เช่น "อกไก่ทอด" (อกไก่ ทับ ไก่ทอด) → ประกอบเอง
   function ingredientOverrides(text, dishAlias, ingAlias) {
@@ -225,6 +243,9 @@
     const lines = [];
     let kind = 'food';
     let mode = 'none';
+    // ข้าวน้อย / ข้าวพิเศษ: ดึงออกก่อน แล้วค่อยบวก/หักทีหลัง
+    const riceMods = [];
+    RICE_MODS.forEach((m) => { for (const al of m.a) { const a = norm(al); if (text.includes(a)) { text = take(text, a); riceMods.push(m); break; } } });
 
     // 6.1 เมนูสำเร็จ
     let dish = longestHit(text, DISH_IDX);
@@ -236,6 +257,13 @@
       kind = dish.item.c;
       lines.push({ label: `${dish.item.n} (${dish.item.s})`, kcal: dish.item.k, src: dish.item.src, base: true });
       text = take(text, dish.alias);
+      // เมนูที่สองที่พิมพ์ต่อกัน เช่น "ไก่ย่าง ส้มตำ" (คำยาว ≥ 3 ตัวอักษร กันจับผิด)
+      for (;;) {
+        const h = longestHit(text, DISH_IDX);
+        if (!h || h.alias.length < 3) break;
+        lines.push({ label: `${h.item.n} (${h.item.s})`, kcal: h.item.k, src: h.item.src });
+        text = take(text, h.alias);
+      }
       // ของกินคู่ที่พิมพ์ต่อท้าย เช่น "ส้มตำ ข้าวเหนียว"
       const side = allHits(text, CARBS);
       side.hits.forEach((x) => lines.push({ label: `${x.n} ${x.g} g`, kcal: Math.round((x.k * x.g) / 100), src: x.src }));
@@ -275,6 +303,12 @@
       const add = allHits(text, ADDONS);
       add.hits.forEach((x) => lines.push({ label: x.n, kcal: x.k, src: x.src }));
       text = add.rest;
+      riceMods.forEach((x) => {
+        // เมนูที่ไม่มีข้าวอยู่แล้ว (สุกี้, ต้มยำ) + "ข้าวน้อย" = สั่งข้าวมา 1 ทัพพี
+        const hasRice = (dish && /ข้าว/.test(dish.item.n)) || lines.some((l) => !l.base && /^ข้าว/.test(l.label));
+        if (x.k < 0 && !hasRice) lines.push({ label: 'ข้าวสวย 1 ทัพพี (ข้าวน้อย)', kcal: 80, src: 'S' });
+        else lines.push({ label: x.n, kcal: x.k, src: x.src });
+      });
     }
 
     // 6.4 ระดับความหวาน (เฉพาะเครื่องดื่มที่มีน้ำตาล)
@@ -348,7 +382,7 @@
   function tdeeFormula(p) { return bmr(p) * (p.activity || 1.2); }
 
   // ค่าเริ่มต้นของ Patrick (13 ต.ค. 2026): ชาย 26 ปี 171 cm 93 kg · นั่ง 70% เดิน 30% + ออกหน้างานบางวัน
-  const DEFAULT_PROFILE = { sex: 'male', age: 26, cm: 171, kg: 93, activity: 1.3, goalKg: 70, deficit: 750, exerciseCredit: 0 };
+  const DEFAULT_PROFILE = { sex: 'male', age: 26, cm: 171, kg: 93, activity: 1.3, goalKg: 70, deficit: 750, exerciseCredit: 0, midKg: 80, planStart: '2026-11-18', ifOn: 1, ifStart: '11:30', ifEnd: '19:30' };
 
   // แนวโน้มน้ำหนัก: ถดถอยเชิงเส้นของน้ำหนักทุกวันในช่วงที่เลือก → กก./วัน
   function weightSlope(weights) {

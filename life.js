@@ -29,7 +29,7 @@
   const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (e) { return d; } };
   const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } };
 
-  const BUILD = '2026.10.23-2';
+  const BUILD = '2026.11.17-1';
   const MODES = {
     money: { name: 'เงิน', sub: 'รายรับ รายจ่าย เดินทาง ลงทุน', c: '#C9A46A', soft: '#2A2419', mark: '฿' },
     todo: { name: 'To Do List', sub: 'งาน MEA · เรียน · ส่วนตัว', c: '#C9F24A', soft: '#1B2110', mark: '✓' },
