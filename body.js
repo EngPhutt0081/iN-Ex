@@ -135,7 +135,7 @@
 
   /* ---------- my plan (แผนของฉัน) ---------- */
   const PLAN_MENU = [
-    ['มื้อแรก', ['กะเพราอกไก่ ข้าวน้อย ไข่ต้ม', 'ข้าวมันไก่ต้ม ข้าวน้อย', 'ก๋วยเตี๋ยวน้ำใส', 'ผัดผักรวมกุ้ง ข้าวน้อย']],
+    ['มื้อแรก', ['กะเพราอกไก่ ข้าวน้อย ไข่ต้ม', 'ข้าวราดแกง ผัดผักรวม ไก่ผัดขิง ข้าวน้อย', 'ข้าวมันไก่ต้ม ข้าวน้อย', 'ก๋วยเตี๋ยวน้ำใส', 'ผัดผักรวมกุ้ง ข้าวน้อย']],
     ['ของว่าง (7-11)', ['อกไก่ CP 2 ซอง', 'ไข่ต้ม 2 ฟอง', 'กรีกโยเกิร์ต', 'นมถั่วเหลืองไม่หวาน', 'กล้วย', 'เวย์โปรตีน']],
     ['หลังวิ่ง', ['ไก่ย่าง ส้มตำ ข้าวน้อย', 'ปลาเผา ผักลวก ข้าวน้อย', 'สุกี้น้ำ ข้าวน้อย', 'ข้าวต้มปลา ไข่ต้ม', 'ต้มยำน้ำใส ไก่ย่าง ข้าวน้อย']],
   ];
@@ -362,6 +362,8 @@
     let h = '<div class="field" style="margin-top:6px"><input id="bfSearch" placeholder="ค้นหาเมนู เช่น ข้าวผัด" value="' + esc(fq) + '" autocomplete="off" aria-label="ค้นหาเมนู"></div>';
     if (fav.length) h += '<div class="h2">กินบ่อย<span>แตะเพื่อบันทึก</span></div><div class="recent">' + fav.map((x) => '<button type="button" class="rchip" data-bqtext="' + esc(x.name) + '"><span><b>' + esc(x.name) + '</b><small>' + fmt(x.kcal) + ' kcal · ' + x.n + ' ครั้ง</small></span></button>').join('') + '</div>';
     h += '<div class="h2">เมนู ' + E.DISHES.length + ' รายการ<span>kcal ต่อ 1 ที่ · แตะดูส่วนประกอบ</span></div><div class="b-db" id="bfList">' + foodListHTML() + '</div>';
+    h += '<div class="h2">ข้าวราดแกง<span>kcal ต่อกับข้าว 100 g · แตะเพื่อบันทึก</span></div><p class="b-src" style="margin:0 2px 8px">พิมพ์ “ข้าวราดแกง” ตามด้วยกับข้าว เช่น “ข้าวราดแกง เขียวหวาน ผัดผักรวม” · ข้าว ' + E.KG.rice + ' g · 1 อย่าง ' + E.KG.each[0] + ' g · 2 อย่าง อย่างละ ' + E.KG.each[1] + ' g · 3 อย่าง อย่างละ ' + E.KG.each[2] + ' g · ไข่ไม่นับเป็นอย่าง · ปรับ ± ได้ตอนบันทึก</p><div class="b-db">' +
+      E.KAENG.map((k) => { const c = E.COMP[k.key]; return '<button class="b-item" type="button" data-bqtext="ข้าวราดแกง ' + esc(k.n) + '"><span><b>' + esc(k.n) + '</b><small>' + (k.fixed ? '1 ฟอง ' + k.fixed + ' g · ' : '') + 'P ' + c[2] + ' · C ' + c[3] + ' · F ' + c[4] + ' g ต่อ 100 g</small></span><b>' + fmt(c[1]) + '</b></button>'; }).join('') + '</div>';
     h += '<div class="h2">วัตถุดิบ<span>kcal ต่อ 100 g</span></div><div class="panel"><div class="ledger">' + E.INGREDIENTS.map((i) => '<div><span>' + esc(i.n) + '<small style="display:block">ค่าเริ่มต้น ' + i.g + ' g ต่อที่ · ' + esc(i.src) + '</small></span><b>' + i.k + '</b></div>').join('') + '</div></div>';
     h += '<div class="h2">วิธีปรุง<span>บวกเพิ่มจากวัตถุดิบ</span></div><div class="panel"><div class="ledger">' + E.METHODS.map((m) => '<div><span>' + esc(m.n) + '<small style="display:block">' + esc(m.note) + '</small></span><b>' + (m.perServing != null ? '+' + m.perServing + '/ที่' : '+' + m.per100g + '/100 g') + '</b></div>').join('') + '</div></div>';
     h += '<div class="h2">แหล่งข้อมูล</div><div class="b-src">' + Object.keys(E.SRC).map((k) => '<div>' + k + ' = ' + (SRC_URL[k] ? '<a href="' + SRC_URL[k] + '" target="_blank" rel="noopener">' + esc(E.SRC[k]) + '</a>' : esc(E.SRC[k])) + '</div>').join('') + '<div style="margin-top:6px">ทุกค่าเป็นค่าประมาณ ร้านจริงอาจต่างได้ ±20–30%</div></div>';

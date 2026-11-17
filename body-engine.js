@@ -158,6 +158,18 @@
   // match('กะเพราหมูกรอบ ไข่ดาว 65') →
   //   { kcal, lines:[{label,kcal,src}], category:'อาหาร', kind:'food', price:65, mode:'dish'|'built'|'none' }
   // ชื่อเมนูเต็มนับเป็นคำค้นด้วย (พิมพ์ "ข้าวกะเพราไก่" ต้องไม่เหลือ "ข้าว" ให้นับซ้ำ)
+  // ข้าวราดแกง: กับข้าวแต่ละอย่าง = ส่วนประกอบเสมือน k0, k1 … (ค่าต่อ 100 g จากสูตร)
+  const KG = FDB.KG || { rice: 180, each: [150, 100, 80, 70] };
+  const KAENG = (FDB.K || []).map((t, i) => {
+    const w = t[2].reduce((a, x) => a + x[1], 0) || 100, tot = sumParts(t[2].map((x) => partOf(x[0], x[1])).filter(Boolean)), key = 'k' + i;
+    COMP[key] = [t[0], Math.round(tot.kcal * 100 / w), r1(tot.p * 100 / w), r1(tot.c * 100 / w), r1(tot.f * 100 / w)];
+    return { n: t[0], a: t[1].concat(t[0]), key, fixed: t[3] || null };
+  });
+  (function () {
+    const m = KAENG.filter((x) => !x.fixed); const avg = (j) => r1(m.reduce((a, x) => a + COMP[x.key][j], 0) / (m.length || 1));
+    COMP.k_avg = ['กับข้าวทั่วไป (เฉลี่ย)', Math.round(avg(1)), avg(2), avg(3), avg(4)];
+  })();
+  const KAENG_TRIG = ['ข้าวราดแกง', 'ข้าวแกง', 'ราดแกง', 'ข้าวกับข้าว'];
   const DISH_IDX = DISHES.map((d) => ({ ...d, a: d.a.concat(d.n.replace(/\(.*?\)|\d+.*$/g, '')) }));
   const EGG_ADDONS = ADDONS.filter((x) => x.k > 0 && /ไข่/.test(x.n));
   const CARBS = INGREDIENTS.filter((x) => x.t === 'carb');
@@ -194,10 +206,23 @@
     const flags = {};
     FLAGS.forEach(([k, al]) => { for (const a0 of al) { const a = norm(a0); if (text.includes(a)) { text = take(text, a); flags[k] = true; break; } } });
 
+    // 6.0 ข้าวราดแกง: ข้าว 1 จาน + กับข้าวตามจำนวนอย่าง (ยิ่งหลายอย่าง ตักอย่างละน้อยลง)
+    let kaeng = null;
+    const trig = KAENG_TRIG.map(norm).find((a) => text.includes(a));
+    if (trig) {
+      text = take(text, trig);
+      const tp = allHits(text, KAENG); text = tp.rest;
+      const n = tp.hits.filter((x) => !x.fixed).length;
+      const each = KG.each[Math.min(Math.max(n, 1), KG.each.length) - 1];
+      const kp = [['rice', KG.rice]];
+      if (!n) kp.push(['k_avg', KG.each[1] * 2]);
+      tp.hits.forEach((x) => kp.push([x.key, x.fixed || each]));
+      kaeng = { item: { n: 'ข้าวราดแกง' + (tp.hits.length ? ': ' + tp.hits.map((x) => x.n).join(' + ') : ' 2 อย่าง (ยังไม่ระบุกับ)'), c: 'food', parts: kp, unit: 'จาน' }, alias: '' };
+    }
     // 6.1 เมนูสำเร็จ (แยกส่วนประกอบ)
-    let dish = longestHit(text, DISH_IDX);
+    let dish = kaeng || longestHit(text, DISH_IDX);
     const ingTop = longestHit(text, INGREDIENTS);
-    if (dish && (nums.grams || (ingTop && ingredientOverrides(text, dish.alias, ingTop.alias)))) dish = null;
+    if (dish && !kaeng && (nums.grams || (ingTop && ingredientOverrides(text, dish.alias, ingTop.alias)))) dish = null;
 
     if (dish) {
       mode = 'dish';
@@ -408,7 +433,7 @@
     };
   }
 
-  const api = { DEFAULT_PROFILE, DISHES, COMP, INGREDIENTS, METHODS, ADDONS, SRC, MONEY_CAT, match, suggest, partOf, sumParts, linesFromParts, bmr, tdeeFormula, tdeeAdaptive, tdeeUsed, budget, weightSlope, norm };
+  const api = { DEFAULT_PROFILE, DISHES, COMP, KAENG, KG, INGREDIENTS, METHODS, ADDONS, SRC, MONEY_CAT, match, suggest, partOf, sumParts, linesFromParts, bmr, tdeeFormula, tdeeAdaptive, tdeeUsed, budget, weightSlope, norm };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.BodyEngine = api;
 })(typeof window !== 'undefined' ? window : globalThis);
